@@ -1,0 +1,5 @@
+[tools]
+lune = "lune-org/lune@0.10.5"
+rojo = "rojo-rbx/rojo@7.7.0-rc.1"
+wally = "upliftgames/wally@0.3.2"
+luau-lsp = "JohnnyMorganz/luau-lsp@1.70.1"
