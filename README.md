@@ -58,7 +58,7 @@ The exit code is 0 when everything passes and 1 when something fails, so it work
 
 - **`.lune/test.luau`**: the launcher and your config. If you already have a `lune/` folder, it goes at `lune/test.luau` instead.
 - **`tests/`**: example unit and e2e specs.
-- **`.gitignore` entries**: for the generated `lunetest.project.json` and `lunetest.rbxlx`.
+- **`.gitignore` entries**: for the generated `lunetest.project.json`, `lunetest.rbxlx` and `lunetest.cache.json`.
 - **The Studio plugin**: `LuneTest.rbxmx` in your Studio Plugins folder. **Restart Studio once** if it was already open.
 
 Lune runs `lune/test.luau` before `.lune/test.luau`. If you already have a `lune/test.luau`, `init` tells you instead of writing a second launcher that would never run.
@@ -72,6 +72,7 @@ lune run test e2e                    # e2e specs only
 lune run test unit Economy           # tests whose name contains "Economy"
 lune run test unit Economy Network   # ...or "Network"
 lune run test e2e server             # e2e tests whose name contains "server"
+lune run test --fresh                # retry every e2e spec in Lune, ignoring the cache
 ```
 
 A test's full name is `[kind] Group/SubGroup/SpecName › test name`. Any subfolder is a group, so filters can pick a folder, a spec file or a single test.
@@ -142,6 +143,8 @@ Many specs written for Studio pass in Lune too. So LuneTest tries every e2e spec
 - **The Lune attempt is fast.** A spec stops at its first failure, and each test gets 5 seconds, so specs that need Studio hand over quickly.
 - **Studio only runs the specs that fell back,** and it doesn't open at all if everything passed in Lune.
 - **Each line says where the test ran:** `(lune)` or `(studio)`.
+- **Studio-only specs are remembered.** LuneTest saves which specs needed Studio in `lunetest.cache.json`, keyed by a fingerprint of each spec file. On the next run they go straight to Studio without retrying in Lune. Editing a spec file makes LuneTest retry it in Lune.
+- **`lune run test --fresh` retries everything in Lune.** The fingerprint only covers the spec file itself, so use this after fixing a module a cached spec depends on.
 
 Set `fallback = false` in the config to always run e2e specs in Studio.
 
@@ -261,7 +264,7 @@ Type-check everything in strict mode (needs Roblox's `globalTypes.d.luau` from t
 
 ```sh
 cd example && rojo sourcemap lunetest.project.json -o sourcemap.json
-luau-lsp analyze --platform=roblox --sourcemap=sourcemap.json --definitions=globalTypes.d.luau src tests DevPackages/_Index/*/lunetest/src DevPackages/_Index/*/lunetest/runners
+luau-lsp analyze --platform=roblox --sourcemap=sourcemap.json --definitions=globalTypes.d.luau src tests DevPackages/_Index/*/lunetest/src DevPackages/_Index/*/lunetest/runners DevPackages/_Index/*/lunetest/lune/plugin.luau
 cd .. && luau-lsp analyze --platform=standard lune/cli.luau lune/network.luau lune/init.luau example/.lune/test.luau
 ```
 

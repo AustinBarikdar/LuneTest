@@ -7,6 +7,7 @@
 --   lune run test unit                only unit specs
 --   lune run test e2e                 only Studio specs
 --   lune run test unit Economy Coins  only tests whose name contains "Economy" or "Coins"
+--   lune run test --fresh             forget which e2e specs needed Studio last time
 --
 -- e2e specs are tried in Lune first; any spec with a failure there is rerun in Studio,
 -- whose verdict is final. Studio only opens when at least one spec needs it.
@@ -50,6 +51,10 @@ local IS_WINDOWS = process.os == "windows"
 -- This file lives at <package>/lune/cli.luau.
 local PACKAGE_DIR = assert(string.match(debug.info(1, "s"), "^(.*)[/\\]lune[/\\]cli"), "cannot locate LuneTest package")
 local PLACE_FILE = "lunetest.rbxlx"
+-- Specs that needed Studio last time, keyed by name with a hash of their source, so the
+-- next run sends them straight there instead of waiting them out in Lune again.
+local CACHE_FILE = "lunetest.cache.json"
+local CACHE_VERSION = 1
 -- Lune-side waits (WaitForChild, the e2e attempt's per-test timeout). Everything in Lune
 -- is one process, so anything slower than this needs the real engine, i.e. Studio. Kept
 -- short because every Studio-only spec pays it once before falling back.
@@ -295,6 +300,15 @@ local function printResults(results: Results, where: string?)
 	end
 end
 
+local function matches(name: string, filters: { string }): boolean
+	for _, filter in filters do
+		if string.find(name, filter, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
 -- Binds the first free port from `first`, so two projects can test at the same time.
 local function listen(first: number, handler: (any) -> any): (number, any)
 	for port = first, first + 20 do
@@ -310,9 +324,12 @@ function cli.run(config: Config)
 	local started = DateTime.now().unixTimestampMillis
 	local mode = "all"
 	local filters = {}
+	local fresh = false
 	for _, arg in process.args do
 		if arg == "unit" or arg == "e2e" then
 			mode = arg
+		elseif arg == "--fresh" then
+			fresh = true
 		else
 			table.insert(filters, arg)
 		end
@@ -385,12 +402,40 @@ function cli.run(config: Config)
 	local needStudio = mode ~= "unit" and e2eSpecs > 0
 
 	if needStudio and config.fallback ~= false then
-		-- Try every e2e spec in Lune; a spec with any failure goes to Studio instead.
+		-- Try e2e specs in Lune; a spec with any failure goes to Studio instead.
+		local cached: { [string]: string? } = {}
+		local okCache, cacheFile = pcall(function()
+			return serde.decode("json", fs.readFile(CACHE_FILE))
+		end)
+		if not fresh and okCache and type(cacheFile) == "table" and cacheFile.version == CACHE_VERSION then
+			cached = cacheFile.studio
+		end
+
 		local passed: Results = { passed = 0, failed = 0, log = {} }
 		local fallBack: { string } = {}
-		local options = { filters = filterList, timeout = LUNE_WAIT, bail = true }
+		local hashes: { [string]: string } = {}
+		local known = 0
 		for _, bucket in e2eFolders do
-			local ok, attempt = pcall(function()
+			-- Cached specs skip Lune only when the filters would select the whole spec;
+			-- otherwise Lune decides which of its tests match.
+			local attempt: { string } = {}
+			for _, spec in LuneTest.collect(bucket.folder) do
+				local name, parent = spec.Name, spec.Parent
+				while parent and parent ~= bucket.folder do
+					name, parent = `{parent.Name}/{name}`, parent.Parent
+				end
+				name = bucket.label .. name
+				hashes[name] = serde.hash("sha256", spec.Source)
+				if cached[name] == hashes[name] and (not filterList or matches(name, filterList)) then
+					table.insert(fallBack, name)
+					known += 1
+				else
+					table.insert(attempt, name)
+				end
+			end
+
+			local options = { filters = filterList, timeout = LUNE_WAIT, bail = true, only = attempt }
+			local ok, results = pcall(function()
 				if bucket.client then
 					return network.client(LuneTest.run, bucket.folder, bucket.label, options)
 				end
@@ -398,12 +443,12 @@ function cli.run(config: Config)
 			end)
 			local failedSpecs = {}
 			if ok then
-				for _, entry in attempt.log do
+				for _, entry in results.log do
 					if entry.status == "fail" then
 						failedSpecs[entry.spec] = true
 					end
 				end
-				for _, entry in attempt.log do
+				for _, entry in results.log do
 					if not failedSpecs[entry.spec] then
 						table.insert(passed.log, entry)
 						passed.passed += 1
@@ -411,25 +456,31 @@ function cli.run(config: Config)
 				end
 			else
 				-- The attempt itself broke (e.g. a network handler error): Studio decides all of it.
-				for _, spec in LuneTest.collect(bucket.folder) do
-					local name, parent = spec.Name, spec.Parent
-					while parent and parent ~= bucket.folder do
-						name, parent = `{parent.Name}/{name}`, parent.Parent
-					end
-					failedSpecs[bucket.label .. name] = true
+				for _, name in attempt do
+					failedSpecs[name] = true
 				end
 			end
-			for spec in failedSpecs do
-				table.insert(fallBack, spec)
+			for name in failedSpecs do
+				table.insert(fallBack, name)
+			end
+			-- Remember this run's verdicts; specs that passed in Lune are forgotten.
+			for _, name in attempt do
+				cached[name] = if failedSpecs[name] then hashes[name] else nil
 			end
 		end
+		pcall(fs.writeFile, CACHE_FILE, serde.encode("json", { version = CACHE_VERSION, studio = cached }))
+
 		report(passed, "lune")
 		needStudio = #fallBack > 0
 		if needStudio then
 			table.sort(fallBack)
 			attributes.Only = table.concat(fallBack, "\n")
 			build()
-			info(`{#fallBack} of {e2eSpecs} e2e spec{if e2eSpecs == 1 then "" else "s"} need Studio`)
+			info(
+				`{#fallBack} of {e2eSpecs} e2e spec{if e2eSpecs == 1 then "" else "s"} need Studio{if known > 0
+					then ` ({known} known from last run)`
+					else ""}`
+			)
 		end
 	end
 
