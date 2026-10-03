@@ -50,7 +50,7 @@ type Results = {
 local IS_WINDOWS = process.os == "windows"
 -- This file lives at <package>/lune/cli.luau.
 local PACKAGE_DIR = assert(string.match(debug.info(1, "s"), "^(.*)[/\\]lune[/\\]cli"), "cannot locate LuneTest package")
-local PLACE_FILE = "lunetest.rbxlx"
+local PLACE_FILE = "lunetest.rbxl" -- binary: ~7x faster to load than XML on big places
 -- Specs that needed Studio last time, keyed by name with a hash of their source, so the
 -- next run sends them straight there instead of waiting them out in Lune again.
 local CACHE_FILE = "lunetest.cache.json"

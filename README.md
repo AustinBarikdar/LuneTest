@@ -58,7 +58,7 @@ The exit code is 0 when everything passes and 1 when something fails, so it work
 
 - **`.lune/test.luau`**: the launcher and your config. If you already have a `lune/` folder, it goes at `lune/test.luau` instead.
 - **`tests/`**: example unit and e2e specs.
-- **`.gitignore` entries**: for the generated `lunetest.project.json`, `lunetest.rbxlx`, `lunetest.cache.json` and `lunetest.lock`.
+- **`.gitignore` entries**: for the generated `lunetest.project.json`, `lunetest.rbxl`, `lunetest.cache.json` and `lunetest.lock`.
 - **The Studio plugin**: `LuneTest.rbxmx` in your Studio Plugins folder. **Restart Studio once** if it was already open.
 
 Lune runs `lune/test.luau` before `.lune/test.luau`. If you already have a `lune/test.luau`, `init` tells you instead of writing a second launcher that would never run.

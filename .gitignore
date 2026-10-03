@@ -1,8 +1,8 @@
 .DS_Store
 lunetest.project.json
-lunetest.rbxlx
+lunetest.rbxl
 example/DevPackages
 sourcemap.json
-*.rbxlx.lock
+*.rbxl.lock
 lunetest.cache.json
 lunetest.lock
