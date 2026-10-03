@@ -262,7 +262,7 @@ Type-check everything in strict mode (needs Roblox's `globalTypes.d.luau` from t
 ```sh
 cd example && rojo sourcemap lunetest.project.json -o sourcemap.json
 luau-lsp analyze --platform=roblox --sourcemap=sourcemap.json --definitions=globalTypes.d.luau src tests DevPackages/_Index/*/lunetest/src DevPackages/_Index/*/lunetest/runners
-cd .. && luau-lsp analyze --platform=standard lune example/.lune/test.luau
+cd .. && luau-lsp analyze --platform=standard lune/cli.luau lune/network.luau lune/init.luau example/.lune/test.luau
 ```
 
 To publish: `wally login`, then `wally publish`.
