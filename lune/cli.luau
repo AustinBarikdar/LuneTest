@@ -55,6 +55,10 @@ local PLACE_FILE = "lunetest.rbxlx"
 -- next run sends them straight there instead of waiting them out in Lune again.
 local CACHE_FILE = "lunetest.cache.json"
 local CACHE_VERSION = 1
+-- Held for the whole run: { port, runId }. Two runs in one project would rebuild the same
+-- place file and close each other's Studio windows.
+local LOCK_FILE = "lunetest.lock"
+local ownsLock = false
 -- Lune-side waits (WaitForChild, the e2e attempt's per-test timeout). Everything in Lune
 -- is one process, so anything slower than this needs the real engine, i.e. Studio. Kept
 -- short because every Studio-only spec pays it once before falling back.
@@ -67,6 +71,9 @@ local function info(message: string)
 end
 
 local function fail(message: string): never
+	if ownsLock then
+		pcall(fs.removeFile, LOCK_FILE)
+	end
 	stdio.ewrite(`[lunetest] {stdio.color("red")}{message}{stdio.color("reset")}\n`)
 	return process.exit(1)
 end
@@ -309,6 +316,18 @@ local function matches(name: string, filters: { string }): boolean
 	return false
 end
 
+-- A lock whose run still answers on its port is live; anything else (crash, Ctrl+C) is stale.
+local function lockHeldByLiveRun(): boolean
+	local ok, lock = pcall(function()
+		return serde.decode("json", fs.readFile(LOCK_FILE))
+	end)
+	if not ok or type(lock) ~= "table" then
+		return false
+	end
+	local reached, response = pcall(net.request, `http://127.0.0.1:{lock.port}/alive`)
+	return reached and response.ok and response.body == lock.runId
+end
+
 -- Binds the first free port from `first`, so two projects can test at the same time.
 local function listen(first: number, handler: (any) -> any): (number, any)
 	for port = first, first + 20 do
@@ -335,6 +354,10 @@ function cli.run(config: Config)
 		end
 	end
 
+	if lockHeldByLiveRun() then
+		fail("another `lune run test` is still running in this project; wait for it to finish or stop it")
+	end
+
 	-- Results are only accepted from this run (stale or foreign Studios are ignored).
 	local runId = `{os.time()}-{math.random(1, 1e9)}`
 	local received: Results? = nil
@@ -349,8 +372,13 @@ function cli.run(config: Config)
 			end
 			return { status = 400, body = "not for this run" }
 		end
+		if request.method == "GET" and request.path == "/alive" then
+			return { status = 200, body = runId }
+		end
 		return { status = 404, body = "not found" }
 	end)
+	fs.writeFile(LOCK_FILE, serde.encode("json", { port = port, runId = runId }))
+	ownsLock = true
 
 	local attributes = {
 		AutoPlay = true,
@@ -527,6 +555,7 @@ function cli.run(config: Config)
 			(DateTime.now().unixTimestampMillis - started) / 1000
 		)}s)\n`
 	)
+	pcall(fs.removeFile, LOCK_FILE)
 	process.exit(if total.failed > 0 then 1 else 0)
 end
 

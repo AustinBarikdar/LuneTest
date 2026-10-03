@@ -5,3 +5,4 @@ example/DevPackages
 sourcemap.json
 *.rbxlx.lock
 lunetest.cache.json
+lunetest.lock

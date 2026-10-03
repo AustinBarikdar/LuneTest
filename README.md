@@ -58,7 +58,7 @@ The exit code is 0 when everything passes and 1 when something fails, so it work
 
 - **`.lune/test.luau`**: the launcher and your config. If you already have a `lune/` folder, it goes at `lune/test.luau` instead.
 - **`tests/`**: example unit and e2e specs.
-- **`.gitignore` entries**: for the generated `lunetest.project.json`, `lunetest.rbxlx` and `lunetest.cache.json`.
+- **`.gitignore` entries**: for the generated `lunetest.project.json`, `lunetest.rbxlx`, `lunetest.cache.json` and `lunetest.lock`.
 - **The Studio plugin**: `LuneTest.rbxmx` in your Studio Plugins folder. **Restart Studio once** if it was already open.
 
 Lune runs `lune/test.luau` before `.lune/test.luau`. If you already have a `lune/test.luau`, `init` tells you instead of writing a second launcher that would never run.
@@ -241,6 +241,7 @@ If your project is a library, meaning its tree isn't a `DataModel`, LuneTest mou
 - **Client startup:** the client reports "started" as soon as it loads. The server waits for that signal, not for a fixed amount of time, so a slow client is never cut off halfway through.
 - **Stale results:** each run has a random ID, and results from an old or unrelated Studio are ignored.
 - **Parallel runs:** if the port is taken, the next free one is used, so two projects can run at the same time.
+- **One run per project:** a second `lune run test` in the same project stops right away instead of fighting over the test place and Studio windows. A lock left behind by a crashed or Ctrl+C'd run is detected and taken over automatically.
 - **Updated plugin:** if the plugin was just updated while Studio is open, the run stops immediately and tells you to restart Studio, instead of waiting for the timeout.
 - **Back-to-back runs on macOS:** if `open` hands the place to a Studio that's still quitting and nothing launches, LuneTest notices and opens it again.
 

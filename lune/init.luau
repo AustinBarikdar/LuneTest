@@ -159,7 +159,7 @@ end
 
 local gitignore = if fs.isFile(".gitignore") then fs.readFile(".gitignore") else ""
 local missing = {}
-for _, entry in { "lunetest.project.json", "lunetest.rbxlx", "lunetest.cache.json" } do
+for _, entry in { "lunetest.project.json", "lunetest.rbxlx", "lunetest.cache.json", "lunetest.lock" } do
 	if not string.find(gitignore, entry, 1, true) then
 		table.insert(missing, entry)
 	end
