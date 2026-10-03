@@ -51,8 +51,9 @@ local IS_WINDOWS = process.os == "windows"
 local PACKAGE_DIR = assert(string.match(debug.info(1, "s"), "^(.*)[/\\]lune[/\\]cli"), "cannot locate LuneTest package")
 local PLACE_FILE = "lunetest.rbxlx"
 -- Lune-side waits (WaitForChild, the e2e attempt's per-test timeout). Everything in Lune
--- is one process, so anything slower than this needs the real engine, i.e. Studio.
-local LUNE_WAIT = 5
+-- is one process, so anything slower than this needs the real engine, i.e. Studio. Kept
+-- short because every Studio-only spec pays it once before falling back.
+local LUNE_WAIT = 2
 
 local cli = {}
 
@@ -234,8 +235,8 @@ end
 -- Studio ignores SIGTERM but exits cleanly on SIGHUP; SIGKILL only if it hangs.
 local function terminate(pid: string)
 	process.exec("kill", { "-HUP", pid })
-	for _ = 1, 10 do
-		task.wait(0.3)
+	for _ = 1, 30 do
+		task.wait(0.1)
 		if not process.exec("kill", { "-0", pid }).ok then
 			return
 		end
@@ -442,15 +443,20 @@ function cli.run(config: Config)
 		closeStudio(false)
 		info("running in Studio...")
 		openStudio()
-		local elapsed, opens = 0, 1
+		local elapsed, opens, nextCheck = 0, 1, 8
 		while received == nil and elapsed < timeout do
 			elapsed += task.wait(0.1)
 			-- macOS race: right after a Studio quits, `open` can hand the file to the dying
 			-- app and nothing launches. No Studio process at all means it was lost; reopen.
-			if not IS_WINDOWS and elapsed > 8 * opens and opens < 3 and #studioProcesses() == 0 then
-				opens += 1
-				info("Studio didn't start, opening again...")
-				openStudio()
+			-- Checked every 2s, not every tick: `ps` is a process spawn and Studio is booting.
+			if not IS_WINDOWS and opens < 3 and elapsed >= nextCheck then
+				nextCheck = elapsed + 2
+				if #studioProcesses() == 0 then
+					opens += 1
+					nextCheck = elapsed + 8
+					info("Studio didn't start, opening again...")
+					openStudio()
+				end
 			end
 		end
 		closeStudio(not alreadyRunning)
