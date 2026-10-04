@@ -117,8 +117,15 @@ h2 { font-size: clamp(1.5rem, 3.4vw, 2.05rem); letter-spacing: -.025em; margin: 
 .flow div::before { counter-increment: step; content: counter(step); display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: color-mix(in srgb, var(--moon) 22%, transparent); color: var(--moon); font: 700 .82rem var(--mono); margin-bottom: 10px; }
 .flow b { color: var(--text); display: block; margin-bottom: 2px; }
 
-.split { display: grid; gap: 22px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); align-items: start; }
-pre.code { margin: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-code); color: #c9d1f5; padding: 18px 20px; font-size: .82rem; line-height: 1.7; overflow-x: auto; }
+.split { display: grid; gap: 26px; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); align-items: start; }
+@media (max-width: 1000px) { .split { grid-template-columns: minmax(0, 1fr); } }
+pre.code { margin: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-code); color: #c9d1f5; padding: 18px 20px; font-size: .8rem; line-height: 1.7; overflow-x: auto; }
+/* Scrollbars that match the dark code panels instead of the browser's white default. */
+pre, .tablewrap { scrollbar-width: thin; scrollbar-color: #36427c transparent; }
+pre::-webkit-scrollbar, .tablewrap::-webkit-scrollbar { height: 8px; width: 8px; }
+pre::-webkit-scrollbar-track, .tablewrap::-webkit-scrollbar-track { background: transparent; }
+pre::-webkit-scrollbar-thumb, .tablewrap::-webkit-scrollbar-thumb { background: #36427c; border-radius: 8px; }
+pre::-webkit-scrollbar-thumb:hover, .tablewrap::-webkit-scrollbar-thumb:hover { background: #4a58a0; }
 .k { color: #c4a7ff; } .s { color: #a5e3a0; } .c { color: #6f79a6; } .f { color: #9db4ff; }
 ul.ticks { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
 ul.ticks li { padding-left: 28px; position: relative; color: var(--muted); }
