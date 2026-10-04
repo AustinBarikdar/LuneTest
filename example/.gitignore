@@ -3,3 +3,5 @@ lunetest.rbxl
 lunetest.cache.json
 lunetest.lock
 lunetest.rbxl.lock
+.claude/
+.agents/

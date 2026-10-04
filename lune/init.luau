@@ -176,8 +176,15 @@ if #missing > 0 then
 	print("  updated  .gitignore")
 end
 
+-- The test-writing skill for AI coding agents: Claude Code reads .claude/skills, Codex
+-- reads .agents/skills. Same file for both.
+local skill = fs.readFile(`{cli.packageDir}/skills/lunetest-testing/SKILL.md`)
+for _, folder in { ".claude", ".agents" } do
+	create(`{folder}/skills/lunetest-testing/SKILL.md`, skill)
+end
+
 if cli.installPlugin() then
-	print("  installed LuneTest Studio plugin (restart Studio if it's open)")
+	print("  installed LuneTest Studio plugin")
 end
 
 stdio.write(`\n{stdio.color("green")}Ready.{stdio.color("reset")} Run your tests with: lune run test\n`)

@@ -96,7 +96,8 @@ Running `init` again is harmless. It never overwrites anything and only adds fil
 - **`.lune/test.luau`**: the launcher and your config. If you already have a `lune/` folder, it goes at `lune/test.luau` instead.
 - **`tests/`**: example unit and e2e specs.
 - **`.gitignore` entries**: for the generated `lunetest.project.json`, `lunetest.rbxl`, `lunetest.cache.json` and `lunetest.lock`, plus the `lunetest.rbxl.lock` Studio leaves behind on Windows.
-- **The Studio plugin**: `LuneTest.rbxmx` in your Studio Plugins folder. **Restart Studio once** if it was already open.
+- **A skill for AI coding agents**: `.claude/skills/lunetest-testing/` for Claude Code and `.agents/skills/lunetest-testing/` for Codex. See [AI coding agents](#ai-coding-agents).
+- **The Studio plugin**: `LuneTest.rbxmx` in your Studio Plugins folder. No restart is needed: each test run opens its own Studio process, which loads it.
 
 Lune runs `lune/test.luau` before `.lune/test.luau`. If you already have a `lune/test.luau`, `init` tells you instead of writing a second launcher that would never run.
 
@@ -254,6 +255,22 @@ remotes = {
 
 The keys are parent paths. Folders along the path are created if they don't exist, and if the folder is already in your project, the remotes are added to it.
 
+## AI coding agents
+
+`init` adds a skill that teaches Claude Code and Codex how to write LuneTest specs well. Both tools pick it up automatically when you ask for tests in the project, for example "add tests for the Inventory module" or "write a failing test for this bug, then fix it".
+
+The skill covers:
+
+- **How LuneTest works:** the spec format, where each kind of test goes, the matchers, the simulated network, and how to run and filter tests.
+- **Established testing practice:** write the failing test first, name tests after behaviors, one behavior per test, cover boundaries and error paths, keep tests deterministic and independent, and prefer fast unit tests over Studio ones.
+
+| Tool | Where the skill lives |
+| --- | --- |
+| Claude Code | `.claude/skills/lunetest-testing/SKILL.md` |
+| Codex | `.agents/skills/lunetest-testing/SKILL.md` |
+
+It's a plain Markdown file, so you can edit it to add your project's own conventions. Commit it so your whole team's agents get it. To pick up a newer version after updating LuneTest, delete those two folders and run `init` again.
+
 ## Config
 
 The config is the table at the top of `.lune/test.luau`:
@@ -266,6 +283,7 @@ The config is the table at the top of `.lune/test.luau`:
 | `testTimeout` | `30` | Seconds before a single test counts as hung |
 | `timeout` | `300` | Seconds to wait for Studio to report back |
 | `clientTimeout` | `90` | Seconds the Studio client gets to *start*. Once started, it's only limited by per-test timeouts. |
+| `startTimeout` | `90` | Seconds Studio gets to enter Play before the test place is reopened once |
 | `port` | `44774` | First port tried for Studio's results. If it's taken, the next free one is used. |
 | `remotes` | none | See [Remotes table](#remotes-table) |
 | `fallback` | `true` | Try e2e specs in Lune first and send only the failures to Studio |
@@ -274,17 +292,18 @@ If your project is a library, meaning its tree isn't a `DataModel`, LuneTest mou
 
 ## Reliability on slow machines
 
-- **Starting Play:** the plugin starts Play through `StudioTestService` and retries with backoff. It never sends keystrokes, so it can't press Play in the wrong window.
+- **Starting Play:** the plugin starts Play through `StudioTestService`. It never sends keystrokes, so it can't press Play in the wrong window. It first waits until Studio has finished loading (its interface stops changing), because Studio silently drops a request made too early. That wait adapts to the machine, so it isn't a fixed delay.
+- **Play that never starts:** the server reports in as soon as Play begins. If that hasn't happened after `startTimeout` seconds, LuneTest closes the test place and opens a fresh one, once, so the run doesn't sit until the full timeout.
 - **Client startup:** the client reports "started" as soon as it loads. The server waits for that signal, not for a fixed amount of time, so a slow client is never cut off halfway through.
 - **Stale results:** each run has a random ID, and results from an old or unrelated Studio are ignored.
+- **Sandboxes that block network ports** (some AI coding agents): unit specs still run. Only Studio needs a port, so an e2e run stops with a message saying so.
 - **Parallel runs:** if the port is taken, the next free one is used, so two projects can run at the same time. Each run only ever closes its own test place, never another project's or a place you have open.
 - **One run per project:** a second `lune run test` in the same project stops right away instead of fighting over the test place and Studio windows. A lock left behind by a crashed or Ctrl+C'd run is detected and taken over automatically.
-- **Updated plugin:** if the plugin was just updated while Studio is open, the run stops immediately and tells you to restart Studio, instead of waiting for the timeout.
+- **Updated plugin:** every test place opens in its own Studio process, which loads the plugin fresh. An updated plugin takes effect on the next run, even with other Studio windows open.
 - **Back-to-back runs on macOS:** if `open` hands the place to a Studio that's still quitting and nothing launches, LuneTest notices and opens it again.
 
 ## Troubleshooting
 
-- **"updated the LuneTest Studio plugin…"**: close Studio and run again.
 - **`no results from Studio`**: check Studio's Output window. The runners print `[LuneTest] N passed, M failed` when they finish.
 - **A unit spec says something `is not a valid member`**: that's engine behavior Lune doesn't have. Move the spec to `tests/e2e`.
 - **`Aftman error: ... no aftman.toml files list this tool`**: an old Aftman install is ahead of Rokit on your `PATH`, and Aftman doesn't read `rokit.toml`. Move Rokit's `bin` folder (`~/.rokit/bin`) above Aftman's in `PATH`, then open a new terminal.
