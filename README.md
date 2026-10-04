@@ -66,7 +66,7 @@ Already use Wally? Add LuneTest like any other package:
    wally install
    ```
 
-3. Run the LuneTest `init` once, from your project root. This command differs by system:
+3. Run the LuneTest `init`, from your project root. You only do this **once per project**. This command differs by system:
 
    **macOS / Linux (Terminal):**
 
@@ -86,7 +86,12 @@ Already use Wally? Add LuneTest like any other package:
    lune run test
    ```
 
-`init` never overwrites anything, so it's safe to run again. It creates:
+After that first run you never need `init` again:
+
+- **Updating LuneTest is just `wally install`.** The launcher always loads whichever version is installed.
+- **Teammates don't run it.** The launcher and tests are committed with your project, so after cloning they only need `wally install`.
+
+Running `init` again is harmless. It never overwrites anything and only adds files that are missing. It creates:
 
 - **`.lune/test.luau`**: the launcher and your config. If you already have a `lune/` folder, it goes at `lune/test.luau` instead.
 - **`tests/`**: example unit and e2e specs.
