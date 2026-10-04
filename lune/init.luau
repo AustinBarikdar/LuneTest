@@ -159,7 +159,8 @@ end
 
 local gitignore = if fs.isFile(".gitignore") then fs.readFile(".gitignore") else ""
 local missing = {}
-for _, entry in { "lunetest.project.json", "lunetest.rbxl", "lunetest.cache.json", "lunetest.lock" } do
+-- lunetest.rbxl.lock: left by Studio on Windows, where closing the test place is a force-kill.
+for _, entry in { "lunetest.project.json", "lunetest.rbxl", "lunetest.rbxl.lock", "lunetest.cache.json", "lunetest.lock" } do
 	if not string.find(gitignore, entry, 1, true) then
 		table.insert(missing, entry)
 	end

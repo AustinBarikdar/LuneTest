@@ -58,7 +58,7 @@ The exit code is 0 when everything passes and 1 when something fails, so it work
 
 - **`.lune/test.luau`**: the launcher and your config. If you already have a `lune/` folder, it goes at `lune/test.luau` instead.
 - **`tests/`**: example unit and e2e specs.
-- **`.gitignore` entries**: for the generated `lunetest.project.json`, `lunetest.rbxl`, `lunetest.cache.json` and `lunetest.lock`.
+- **`.gitignore` entries**: for the generated `lunetest.project.json`, `lunetest.rbxl`, `lunetest.cache.json` and `lunetest.lock`, plus the `lunetest.rbxl.lock` Studio leaves behind on Windows.
 - **The Studio plugin**: `LuneTest.rbxmx` in your Studio Plugins folder. **Restart Studio once** if it was already open.
 
 Lune runs `lune/test.luau` before `.lune/test.luau`. If you already have a `lune/test.luau`, `init` tells you instead of writing a second launcher that would never run.
@@ -259,6 +259,14 @@ If your project is a library, meaning its tree isn't a `DataModel`, LuneTest mou
 mkdir -p example/DevPackages/_Index/austinbarikdar_lunetest@0.1.0
 ln -s "$PWD" example/DevPackages/_Index/austinbarikdar_lunetest@0.1.0/lunetest
 cd example && lune run test
+```
+
+On Windows PowerShell, use a junction instead (no admin rights needed):
+
+```powershell
+New-Item -ItemType Directory -Force example/DevPackages/_Index/austinbarikdar_lunetest@0.1.0
+New-Item -ItemType Junction -Path example/DevPackages/_Index/austinbarikdar_lunetest@0.1.0/lunetest -Target $PWD
+cd example; lune run test
 ```
 
 Type-check everything in strict mode (needs Roblox's `globalTypes.d.luau` from the luau-lsp repo, and `lune setup` for the `.luaurc` alias):

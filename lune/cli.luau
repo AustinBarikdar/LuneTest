@@ -260,10 +260,14 @@ end
 -- and nothing else is open in it, so unsaved work in your other places is never touched.
 local function closeStudio(quitStudio: boolean)
 	if IS_WINDOWS then
+		-- Every place is its own Studio process with the place path on its command line.
+		-- Matched by full path (not window title, which is blank while Studio loads), so
+		-- another project's test place is left alone.
+		local place = string.gsub(absolute(PLACE_FILE), "'", "''")
 		process.exec("powershell", {
 			"-NoProfile",
 			"-Command",
-			`Get-Process RobloxStudio* -ErrorAction SilentlyContinue | Where-Object \{ $_.MainWindowTitle -like '*{PLACE_FILE}*' } | Stop-Process -Force`,
+			`Get-CimInstance Win32_Process | Where-Object \{ $_.Name -like 'RobloxStudio*' -and $_.CommandLine -like ('*' + [WildcardPattern]::Escape('{place}') + '*') } | ForEach-Object \{ Stop-Process -Id $_.ProcessId -Force }`,
 		})
 		return
 	end
