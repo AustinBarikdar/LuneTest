@@ -13,6 +13,7 @@ local config = {
 	testTimeout = 30, -- seconds before a single test counts as hung
 	timeout = 300, -- seconds to wait for Studio to report back
 	fallback = true, -- try e2e specs in Lune first; only the ones that fail there run in Studio
+	cloud = { universeId = 10358916978, placeId = 102338780824373 }, -- LuneTest sandbox place, used by --cloud
 
 	-- Remotes to create in the test place (works in unit and e2e). A bare name is a RemoteEvent.
 	remotes = {

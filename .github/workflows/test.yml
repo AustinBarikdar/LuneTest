@@ -1,17 +1,22 @@
-name: Tests
+name: CI
 
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
 
 jobs:
-  unit:
+  test:
+    name: Test
     runs-on: ubuntu-latest
+    env:
+      # Optional. Without this secret the cloud step is skipped and the rest still runs.
+      ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rojo, Lune and Wally
+      - name: Install Rojo, Lune, Wally and luau-lsp
         uses: CompeyDev/setup-rokit@v0.1.2
 
       # Wally has no local path dependencies, so link this checkout into the example
@@ -21,6 +26,58 @@ jobs:
           mkdir -p example/DevPackages/_Index/austinbarikdar_lunetest@0.1.0
           ln -s "$PWD" example/DevPackages/_Index/austinbarikdar_lunetest@0.1.0/lunetest
 
-      - name: Unit tests
+      - name: Unit specs
         working-directory: example
         run: lune run test unit
+
+      - name: Strict type check (Roblox-side code)
+        working-directory: example
+        run: |
+          curl -fsSL -o globalTypes.d.luau https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/1.70.1/scripts/globalTypes.d.luau
+          rojo sourcemap lunetest.project.json -o sourcemap.json
+          package=DevPackages/_Index/austinbarikdar_lunetest@0.1.0/lunetest
+          luau-lsp analyze --platform=roblox --sourcemap=sourcemap.json --definitions=globalTypes.d.luau \
+            src tests "$package/src" "$package/runners" "$package/lune/plugin.luau" "$package/lune/cloud.luau"
+
+      - name: Strict type check (Lune-side code)
+        run: |
+          lune setup
+          luau-lsp analyze --platform=standard lune/cli.luau lune/network.luau lune/init.luau install.luau example/.lune/test.luau
+
+      # Server and shared specs on Roblox's servers, in the blank sandbox place configured
+      # in example/.lune/test.luau. Client specs need Studio and are reported as skipped.
+      - name: Cloud specs
+        if: env.ROBLOX_API_KEY != ''
+        working-directory: example
+        run: lune run test e2e --cloud
+
+  publish:
+    name: Publish to Wally
+    # Only for version tags (v0.1.1, ...), and only after the tests pass.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      WALLY_TOKEN: ${{ secrets.WALLY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Wally
+        uses: CompeyDev/setup-rokit@v0.1.2
+
+      - name: Tag must match the version in wally.toml
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' wally.toml)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match wally.toml version $version" >&2
+            exit 1
+          fi
+
+      - name: Publish
+        run: |
+          if [ -z "$WALLY_TOKEN" ]; then
+            echo "The WALLY_TOKEN secret is not set; cannot publish" >&2
+            exit 1
+          fi
+          wally login --token "$WALLY_TOKEN"
+          wally publish
