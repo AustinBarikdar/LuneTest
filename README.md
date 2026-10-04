@@ -28,7 +28,7 @@ The exit code is 0 when everything passes and 1 when something fails, so it work
 
 ## Requirements
 
-- [Rojo](https://rojo.space) 7, [Lune](https://lune-org.github.io/docs) 0.10+ and [Wally](https://wally.run). With [Rokit](https://github.com/rojo-rbx/rokit): `rokit add rojo`, `rokit add lune`, `rokit add wally`.
+- [Rojo](https://rojo.space) 7, [Lune](https://lune-org.github.io/docs) 0.10+ and [Wally](https://wally.run). With [Rokit](https://github.com/rojo-rbx/rokit): `rokit init` (if the project has no `rokit.toml` yet), then `rokit add rojo`, `rokit add lune`, `rokit add wally`.
 - For e2e specs only: Roblox Studio on macOS or Windows, signed in.
 
 ## Setup
@@ -240,7 +240,7 @@ If your project is a library, meaning its tree isn't a `DataModel`, LuneTest mou
 - **Starting Play:** the plugin starts Play through `StudioTestService` and retries with backoff. It never sends keystrokes, so it can't press Play in the wrong window.
 - **Client startup:** the client reports "started" as soon as it loads. The server waits for that signal, not for a fixed amount of time, so a slow client is never cut off halfway through.
 - **Stale results:** each run has a random ID, and results from an old or unrelated Studio are ignored.
-- **Parallel runs:** if the port is taken, the next free one is used, so two projects can run at the same time.
+- **Parallel runs:** if the port is taken, the next free one is used, so two projects can run at the same time. Each run only ever closes its own test place, never another project's or a place you have open.
 - **One run per project:** a second `lune run test` in the same project stops right away instead of fighting over the test place and Studio windows. A lock left behind by a crashed or Ctrl+C'd run is detected and taken over automatically.
 - **Updated plugin:** if the plugin was just updated while Studio is open, the run stops immediately and tells you to restart Studio, instead of waiting for the timeout.
 - **Back-to-back runs on macOS:** if `open` hands the place to a Studio that's still quitting and nothing launches, LuneTest notices and opens it again.
@@ -250,6 +250,8 @@ If your project is a library, meaning its tree isn't a `DataModel`, LuneTest mou
 - **"updated the LuneTest Studio plugin…"**: close Studio and run again.
 - **`no results from Studio`**: check Studio's Output window. The runners print `[LuneTest] N passed, M failed` when they finish.
 - **A unit spec says something `is not a valid member`**: that's engine behavior Lune doesn't have. Move the spec to `tests/e2e`.
+- **`Aftman error: ... no aftman.toml files list this tool`**: an old Aftman install is ahead of Rokit on your `PATH`, and Aftman doesn't read `rokit.toml`. Move Rokit's `bin` folder (`~/.rokit/bin`) above Aftman's in `PATH`, then open a new terminal.
+- **The first e2e run takes a minute or more**: Studio was updating itself before it opened the place. Later runs are back to a few seconds.
 
 ## Developing LuneTest
 
@@ -269,7 +271,7 @@ New-Item -ItemType Junction -Path example/DevPackages/_Index/austinbarikdar_lune
 cd example; lune run test
 ```
 
-Type-check everything in strict mode (needs Roblox's `globalTypes.d.luau` from the luau-lsp repo, and `lune setup` for the `.luaurc` alias):
+Type-check everything in strict mode (needs Roblox's `globalTypes.d.luau` from the luau-lsp repo, and `lune setup` for the `.luaurc` alias). On Windows, run these from Git Bash: PowerShell doesn't expand the `*` in the paths.
 
 ```sh
 cd example && rojo sourcemap lunetest.project.json -o sourcemap.json
@@ -277,4 +279,4 @@ luau-lsp analyze --platform=roblox --sourcemap=sourcemap.json --definitions=glob
 cd .. && luau-lsp analyze --platform=standard lune/cli.luau lune/network.luau lune/init.luau example/.lune/test.luau
 ```
 
-To publish: `wally login`, then `wally publish`.
+To publish: bump `version` in `wally.toml` (a published version can't be replaced), then `wally login` once and `wally publish`.

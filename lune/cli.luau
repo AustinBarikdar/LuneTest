@@ -328,6 +328,15 @@ local function lockHeldByLiveRun(): boolean
 	if not ok or type(lock) ~= "table" then
 		return false
 	end
+	-- A port we can bind has nobody listening. Checked first because Windows takes ~2s to
+	-- refuse a connection to a dead port, which the run after every Ctrl+C would pay.
+	local free, probe = pcall(net.serve, lock.port, function()
+		return ""
+	end)
+	if free then
+		probe.stop()
+		return false
+	end
 	local reached, response = pcall(net.request, `http://127.0.0.1:{lock.port}/alive`)
 	return reached and response.ok and response.body == lock.runId
 end
