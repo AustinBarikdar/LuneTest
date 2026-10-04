@@ -532,6 +532,8 @@ Found a bug, or want to fix one? Both are welcome.
 
 The full guide, with setup steps and a map of the code, is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
+**Found a security problem?** Please report it privately. [SECURITY.md](SECURITY.md) explains how, and what LuneTest does on your machine.
+
 ## Credits
 
 LuneTest doesn't bundle any of these, but it wouldn't exist without them. Thank you to the people who build and maintain:

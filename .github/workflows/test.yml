@@ -6,18 +6,25 @@ on:
     tags: ["v*"]
   pull_request:
 
+# The workflow's own token can only read the repository.
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
     env:
-      # Optional. Without this secret the cloud step is skipped and the rest still runs.
-      ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
+      # Only whether the secret exists. The key itself is given to the one step that uses
+      # it, so no other step (including third-party actions) can read it.
+      HAS_ROBLOX_KEY: ${{ secrets.ROBLOX_API_KEY != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Install Rojo, Lune, Wally and luau-lsp
-        uses: CompeyDev/setup-rokit@v0.1.2
+        uses: CompeyDev/setup-rokit@d49be92bd9502180218c3f43e7988faa945217b0 # v0.1.2
 
       # Wally has no local path dependencies, so link this checkout into the example
       # the same way `wally install` would lay it out.
@@ -46,9 +53,12 @@ jobs:
 
       # Server and shared specs on Roblox's servers, in the blank sandbox place configured
       # in example/.lune/test.luau. Client specs need Studio and are reported as skipped.
+      # Skipped when the secret isn't set, which includes pull requests from forks.
       - name: Cloud specs
-        if: env.ROBLOX_API_KEY != ''
+        if: env.HAS_ROBLOX_KEY == 'true'
         working-directory: example
+        env:
+          ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
         run: lune run test e2e --cloud
 
   publish:
@@ -57,13 +67,13 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: test
     runs-on: ubuntu-latest
-    env:
-      WALLY_TOKEN: ${{ secrets.WALLY_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Install Wally
-        uses: CompeyDev/setup-rokit@v0.1.2
+        uses: CompeyDev/setup-rokit@d49be92bd9502180218c3f43e7988faa945217b0 # v0.1.2
 
       - name: Tag must match the version in wally.toml
         run: |
@@ -74,6 +84,8 @@ jobs:
           fi
 
       - name: Publish
+        env:
+          WALLY_TOKEN: ${{ secrets.WALLY_TOKEN }}
         run: |
           if [ -z "$WALLY_TOKEN" ]; then
             echo "The WALLY_TOKEN secret is not set; cannot publish" >&2

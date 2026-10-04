@@ -62,7 +62,7 @@ local PLACE_FILE = "lunetest.rbxl" -- binary: ~7x faster to load than XML on big
 -- next run sends them straight there instead of waiting them out in Lune again.
 local CACHE_FILE = "lunetest.cache.json"
 local CACHE_VERSION = 1
--- Held for the whole run: { port, runId }. Two runs in one project would rebuild the same
+-- Held for the whole run: { port, token }. Two runs in one project would rebuild the same
 -- place file and close each other's Studio windows.
 local LOCK_FILE = "lunetest.lock"
 local ownsLock = false
@@ -351,7 +351,7 @@ local function lockHeldByLiveRun(): boolean
 		return false
 	end
 	local reached, response = pcall(net.request, `http://127.0.0.1:{lock.port}/alive`)
-	return reached and response.ok and response.body == lock.runId
+	return reached and response.ok and response.body == lock.token
 end
 
 -- Binds the first free port from `first`, so two projects can test at the same time.
@@ -512,7 +512,13 @@ local function run(config: Config)
 	end
 
 	-- Results are only accepted from this run (stale or foreign Studios are ignored).
-	local runId = `{os.time()}-{math.random(1, 1e9)}`
+	-- Hashed from several moving values so it can't be guessed from the time alone. The lock
+	-- token is separate: /alive answers anyone on this machine, and must not hand out the
+	-- id that lets results be accepted.
+	local function token(): string
+		return serde.hash("sha256", `{DateTime.now().unixTimestampMillis}-{os.clock()}-{math.random()}-{math.random()}`)
+	end
+	local runId, lockToken = token(), token()
 	local received: Results? = nil
 	local playStarted = false
 	local port, server = listen(config.port or 44774, function(request)
@@ -531,13 +537,13 @@ local function run(config: Config)
 			return { status = 200, body = "ok" }
 		end
 		if request.method == "GET" and request.path == "/alive" then
-			return { status = 200, body = runId }
+			return { status = 200, body = lockToken }
 		end
 		return { status = 404, body = "not found" }
 	end)
 	if server then
 		-- The lock is "live" only while this port answers, so no port means no lock.
-		fs.writeFile(LOCK_FILE, serde.encode("json", { port = port, runId = runId }))
+		fs.writeFile(LOCK_FILE, serde.encode("json", { port = port, token = lockToken }))
 		ownsLock = true
 	end
 
