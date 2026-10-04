@@ -160,8 +160,13 @@ end
 local gitignore = if fs.isFile(".gitignore") then fs.readFile(".gitignore") else ""
 local missing = {}
 -- lunetest.rbxl.lock: left by Studio on Windows, where closing the test place is a force-kill.
+-- Whole lines: "lunetest.rbxl" must not count as present because "lunetest.rbxl.lock" is.
+local ignored = {}
+for line in string.gmatch(gitignore, "[^\r\n]+") do
+	ignored[line] = true
+end
 for _, entry in { "lunetest.project.json", "lunetest.rbxl", "lunetest.rbxl.lock", "lunetest.cache.json", "lunetest.lock" } do
-	if not string.find(gitignore, entry, 1, true) then
+	if not ignored[entry] then
 		table.insert(missing, entry)
 	end
 end
