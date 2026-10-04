@@ -33,6 +33,24 @@ The exit code is 0 when everything passes and 1 when something fails, so it work
 
 ## Setup
 
+From your project root, one command does everything:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/install.luau | lune run -
+```
+
+On Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/install.luau | lune run -
+```
+
+It adds LuneTest to `wally.toml` (creating the file if you don't have one), runs `wally install`, sets the project up, and runs the example unit tests so you can see it working. If Rojo or Wally is missing, it installs them with Rokit. It's safe to run again.
+
+### Manual setup
+
+The installer does these steps for you:
+
 1. Add LuneTest to `wally.toml`:
 
    ```toml
