@@ -177,14 +177,18 @@ function LuneTest.run(container: Instance?, label: string, options: Options?): R
 			continue
 		end
 
-		local names = {}
-		for name in tests :: { [string]: any } do
+		-- Keys are usually strings, but an array of functions is valid too; compare as
+		-- strings so mixed key types can't make the sort throw.
+		local names: { any } = {}
+		for name in tests :: { [any]: any } do
 			table.insert(names, name)
 		end
-		table.sort(names)
+		table.sort(names, function(a, b)
+			return tostring(a) < tostring(b)
+		end)
 
 		for _, name in names do
-			local testName = `{specName} › {name}`
+			local testName = `{specName} › {tostring(name)}`
 			if not matches(testName, filters) then
 				continue
 			end
