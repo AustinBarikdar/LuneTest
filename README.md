@@ -136,6 +136,7 @@ The exit code is 0 when everything passes and 1 when something fails, so it work
 - [Reliability on slow machines](#reliability-on-slow-machines)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
+- [Credits](#credits)
 - [Developing LuneTest](#developing-lunetest)
 
 ## Requirements
@@ -528,6 +529,24 @@ Found a bug, or want to fix one? Both are welcome.
 - **Open a pull request:** branch from `main`, keep it to one fix or feature, run `lune run test unit` in `example/`, and say what you tested and on which system. CI runs the unit specs and strict type checks on every pull request.
 
 The full guide, with setup steps and a map of the code, is in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Credits
+
+LuneTest doesn't bundle any of these, but it wouldn't exist without them. Thank you to the people who build and maintain:
+
+| Project | By | What LuneTest uses it for |
+| --- | --- | --- |
+| [Lune](https://github.com/lune-org/lune) | lune-org | Runs the whole command line, loads the built place, and runs unit specs. |
+| [Rojo](https://github.com/rojo-rbx/rojo) | rojo-rbx | Builds your project, with the test content injected, into a place file. |
+| [Wally](https://github.com/UpliftGames/wally) | Uplift Games | Distributes LuneTest and installs it into your project. |
+| [Rokit](https://github.com/rojo-rbx/rokit) | rojo-rbx | Installs and pins Lune, Rojo and Wally. |
+| [luau-lsp](https://github.com/JohnnyMorganz/luau-lsp) | JohnnyMorganz | Strict type checking of LuneTest's own code, in CI. |
+| [setup-rokit](https://github.com/CompeyDev/setup-rokit) | CompeyDev | Installs the tools on GitHub Actions. |
+| [Roblox Open Cloud](https://create.roblox.com/docs/cloud) and `StudioTestService` | Roblox | Run specs on Roblox's servers and start Play in Studio. |
+
+The `expect(...)` matcher style follows [Jest](https://jestjs.io).
+
+LuneTest is an independent project and is not affiliated with or endorsed by any of them, or by Roblox Corporation.
 
 ## Developing LuneTest
 
