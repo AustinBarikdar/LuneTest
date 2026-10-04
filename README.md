@@ -47,9 +47,9 @@ irm https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/install.luau 
 
 It adds LuneTest to `wally.toml` (creating the file if you don't have one), runs `wally install`, sets the project up, and runs the example unit tests so you can see it working. If Rojo or Wally is missing, it installs them with Rokit. It's safe to run again.
 
-### Manual setup
+### Easy download integration for Wally
 
-The installer does these steps for you:
+Already use Wally? Add LuneTest like any other package:
 
 1. Add LuneTest to `wally.toml`:
 
