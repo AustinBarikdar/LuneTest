@@ -8,6 +8,8 @@
 --   lune run test e2e                 only Studio specs
 --   lune run test unit Economy Coins  only tests whose name contains "Economy" or "Coins"
 --   lune run test --fresh             forget which e2e specs needed Studio last time
+--   lune run test --cloud             run server/shared e2e specs on Roblox's servers (CI)
+--   lune run test --cloud --dry-run   print the Open Cloud calls without sending them
 --
 -- e2e specs are tried in Lune first; any spec with a failure there is rerun in Studio,
 -- whose verdict is final. Studio only opens when at least one spec needs it.
@@ -33,6 +35,9 @@ export type Config = {
 	testTimeout: number?, -- seconds before one test counts as hung; default 30
 	clientTimeout: number?, -- seconds the Studio client gets to start; default 90
 	startTimeout: number?, -- seconds Studio gets to enter Play before the place is reopened; default 90
+	-- Where `--cloud` runs server and shared specs: a throwaway test place, never your live
+	-- game. The API key comes from the ROBLOX_API_KEY environment variable, never from here.
+	cloud: { universeId: number | string, placeId: number | string }?,
 	-- Remotes to create in the test place, by parent path:
 	--   { ["ReplicatedStorage.Remotes"] = { "Chat", GetData = "RemoteFunction" } }
 	-- A bare name is a RemoteEvent.
@@ -361,16 +366,103 @@ local function listen(first: number, handler: (any) -> any): (number?, any)
 	return nil, nil
 end
 
+-- Overridable so the client can be tested against a local stand-in server.
+local OPEN_CLOUD = process.env.LUNETEST_OPEN_CLOUD_URL or "https://apis.roblox.com"
+
+-- Runs the server and shared specs of the built place as an Open Cloud Luau execution
+-- task: no Studio, no window, no port. Results come back as the task's return value.
+local function runCloud(config: Config, dryRun: boolean): Results
+	local cloud = config.cloud
+	if not cloud then
+		return fail("`--cloud` needs `cloud = { universeId = ..., placeId = ... }` in your test launcher. Use a throwaway test place")
+	end
+	local key = process.env.ROBLOX_API_KEY
+	if not key and not dryRun then
+		fail(
+			"`--cloud` needs the ROBLOX_API_KEY environment variable: an Open Cloud API key with "
+				.. "universe-places (write) and luau-execution-sessions (write) on that test place"
+		)
+	end
+	local timeout = math.min(config.timeout or 300, 300) -- tasks are capped at 5 minutes
+
+	local function call(method: "GET" | "POST", url: string, contentType: string?, body: string?): any
+		if dryRun then
+			info(`[dry run] {method} {url}{if body then ` ({#body} bytes)` else ""}`)
+			return nil
+		end
+		local headers: { [string]: string } = { ["x-api-key"] = key :: string }
+		if contentType then
+			headers["Content-Type"] = contentType
+		end
+		local response = net.request({ url = url, method = method, headers = headers, body = body })
+		if not response.ok then
+			fail(`Open Cloud {method} {url} failed: {response.statusCode} {response.statusMessage}\n{response.body}`)
+		end
+		return serde.decode("json", response.body)
+	end
+
+	-- Saved, never Published: the upload must not go live.
+	local version = call(
+		"POST",
+		`{OPEN_CLOUD}/universes/v1/{cloud.universeId}/places/{cloud.placeId}/versions?versionType=Saved`,
+		"application/octet-stream",
+		fs.readFile(PLACE_FILE)
+	)
+	local job = call(
+		"POST",
+		`{OPEN_CLOUD}/cloud/v2/universes/{cloud.universeId}/places/{cloud.placeId}/versions/{if version
+			then version.versionNumber
+			else "<version>"}/luau-execution-session-tasks`,
+		"application/json",
+		serde.encode("json", { script = fs.readFile(`{PACKAGE_DIR}/lune/cloud.luau`), timeout = `{timeout}s` })
+	)
+	if dryRun then
+		info("[dry run] GET the task every 2s until it is COMPLETE or FAILED, then read output.results[1]")
+		return { passed = 0, failed = 0, log = {} }
+	end
+
+	local elapsed = 0
+	while job.state ~= "COMPLETE" and job.state ~= "FAILED" and job.state ~= "CANCELLED" and elapsed < timeout + 60 do
+		elapsed += task.wait(2)
+		job = call("GET", `{OPEN_CLOUD}/cloud/v2/{job.path}`)
+	end
+	local results = job.state == "COMPLETE" and job.output and job.output.results and job.output.results[1]
+	if type(results) == "table" and type(results.log) == "table" then
+		return results
+	end
+
+	-- Show what the task printed; that's where a broken spec or module shows up.
+	local printed = {}
+	local okLogs, logs = pcall(call, "GET" :: "GET", `{OPEN_CLOUD}/cloud/v2/{job.path}/logs?view=FLAT`)
+	if okLogs and type(logs) == "table" then
+		for _, entry in logs.luauExecutionSessionTaskLogs or {} do
+			for _, message in entry.messages or {} do
+				table.insert(printed, tostring(message))
+			end
+		end
+	end
+	return fail(
+		`the cloud task ended as {job.state}: {if job.error then job.error.message or job.error.code else "no results returned"}\n{table.concat(
+			printed,
+			"\n"
+		)}`
+	)
+end
+
 local function run(config: Config)
 	local started = DateTime.now().unixTimestampMillis
 	local mode = "all"
 	local filters = {}
-	local fresh = false
+	local fresh, useCloud, dryRun = false, false, false
 	for _, arg in process.args do
 		if arg == "unit" or arg == "e2e" then
 			mode = arg
 		elseif arg == "--fresh" then
 			fresh = true
+		elseif arg == "--cloud" then
+			useCloud = true
+		elseif arg == "--dry-run" then
+			dryRun = true
 		else
 			table.insert(filters, arg)
 		end
@@ -547,11 +639,51 @@ local function run(config: Config)
 			attributes.Only = table.concat(fallBack, "\n")
 			build()
 			info(
-				`{#fallBack} of {e2eSpecs} e2e spec{if e2eSpecs == 1 then "" else "s"} need Studio{if known > 0
+				`{#fallBack} of {e2eSpecs} e2e spec{if e2eSpecs == 1 then "" else "s"} need {if useCloud
+					then "the real engine"
+					else "Studio"}{if known > 0
 					then ` ({known} known from last run)`
 					else ""}`
 			)
 		end
+	end
+
+	-- --cloud: Roblox's servers stand in for Studio. A task has no client, so client specs
+	-- that need the real engine can't run there; say so instead of dropping them quietly.
+	local skipped: { string } = {}
+	if needStudio and useCloud then
+		local cloudSpecs = 0
+		if attributes.Only then
+			for _, name in string.split(attributes.Only, "\n") do
+				if string.sub(name, 1, 9) == "[client] " then
+					table.insert(skipped, name)
+				else
+					cloudSpecs += 1
+				end
+			end
+		else
+			for _, bucket in e2eFolders do
+				for _, spec in LuneTest.collect(bucket.folder) do
+					if bucket.client then
+						table.insert(skipped, `{bucket.label}{spec.Name}`)
+					else
+						cloudSpecs += 1
+					end
+				end
+			end
+		end
+		if cloudSpecs > 0 then
+			info(`running {cloudSpecs} spec{if cloudSpecs == 1 then "" else "s"} on Roblox's servers...`)
+			report(runCloud(config, dryRun), "cloud")
+		end
+		for _, name in skipped do
+			stdio.write(
+				`  {stdio.color("yellow")}SKIP{stdio.color("reset")}  {name}  {stdio.style("dim")}(needs a real client: run it in Studio){stdio.style(
+					"reset"
+				)}\n`
+			)
+		end
+		needStudio = false
 	end
 
 	if needStudio and not server then
@@ -630,7 +762,9 @@ local function run(config: Config)
 
 	local color: "red" | "green" = if total.failed > 0 then "red" else "green"
 	stdio.write(
-		`\n[lunetest] {stdio.color(color)}{total.passed} passed, {total.failed} failed{stdio.color("reset")} ({string.format(
+		`\n[lunetest] {stdio.color(color)}{total.passed} passed, {total.failed} failed{if #skipped > 0
+			then `, {#skipped} skipped`
+			else ""}{stdio.color("reset")} ({string.format(
 			"%.2f",
 			(DateTime.now().unixTimestampMillis - started) / 1000
 		)}s)\n`

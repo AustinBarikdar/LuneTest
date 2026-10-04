@@ -111,6 +111,7 @@ lune run test unit Economy           # tests whose name contains "Economy"
 lune run test unit Economy Network   # ...or "Network"
 lune run test e2e server             # e2e tests whose name contains "server"
 lune run test --fresh                # retry every e2e spec in Lune, ignoring the cache
+lune run test --cloud                # CI: server/shared e2e specs on Roblox's servers, no Studio
 ```
 
 A test's full name is `[kind] Group/SubGroup/SpecName › test name`. Any subfolder is a group, so filters can pick a folder, a spec file or a single test.
@@ -255,6 +256,53 @@ remotes = {
 
 The keys are parent paths. Folders along the path are created if they don't exist, and if the folder is already in your project, the remotes are added to it.
 
+## CI
+
+**Unit specs** need nothing from Roblox, so they run anywhere, including a Linux CI runner:
+
+```yaml
+# .github/workflows/test.yml
+name: Tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: CompeyDev/setup-rokit@v0.1.2   # installs Rojo, Lune and Wally from rokit.toml
+      - run: wally install
+      - run: lune run test unit
+```
+
+**Server and shared specs** can run on Roblox's own servers with `--cloud`, through the Open Cloud [Luau execution API](https://create.roblox.com/docs/cloud/reference/features/luau-execution). No Studio, no window:
+
+```sh
+lune run test --cloud             # unit specs, then e2e specs in the cloud
+lune run test --cloud --dry-run   # print the Open Cloud calls without sending anything
+```
+
+What `--cloud` does: it uploads the built test place as a **Saved** version (never Published, so nothing goes live), starts a task on that version that runs your specs, and reads the results from the task's return value.
+
+To set it up:
+
+1. Create a **throwaway test place**. Don't use your live game: every run saves a new version of the place.
+2. Create an Open Cloud API key at [create.roblox.com/dashboard/credentials](https://create.roblox.com/dashboard/credentials) with **universe-places** (write) and **luau-execution-sessions** (write) on that place.
+3. Put the IDs in the launcher config: `cloud = { universeId = 123, placeId = 456 },`
+4. Give the key to the run as the `ROBLOX_API_KEY` environment variable. In GitHub Actions, store it as a secret:
+
+   ```yaml
+         - run: lune run test --cloud
+           env:
+             ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
+   ```
+
+What a cloud task can and can't do:
+
+- **It's a bare server.** There are no players and no client, physics doesn't simulate, and your place's own scripts don't start. Specs that work from a cold server pass: real `require`, DataStores, HttpService, engine services.
+- **Client specs are skipped,** and each one is listed as `SKIP` so nothing disappears silently. Specs that assume the game has booted, or need a character, still need Studio.
+- **Lune goes first here too.** Only the specs that fail in Lune are sent to the cloud.
+- **A task can run for 5 minutes at most.**
+
 ## AI coding agents
 
 `init` adds a skill that teaches Claude Code and Codex how to write LuneTest specs well. Both tools pick it up automatically when you ask for tests in the project, for example "add tests for the Inventory module" or "write a failing test for this bug, then fix it".
@@ -286,6 +334,7 @@ The config is the table at the top of `.lune/test.luau`:
 | `startTimeout` | `90` | Seconds Studio gets to enter Play before the test place is reopened once |
 | `port` | `44774` | First port tried for Studio's results. If it's taken, the next free one is used. |
 | `remotes` | none | See [Remotes table](#remotes-table) |
+| `cloud` | none | `{ universeId, placeId }` of the test place `--cloud` uses. See [CI](#ci) |
 | `fallback` | `true` | Try e2e specs in Lune first and send only the failures to Studio |
 
 If your project is a library, meaning its tree isn't a `DataModel`, LuneTest mounts it at `ReplicatedStorage.<project name>`.
