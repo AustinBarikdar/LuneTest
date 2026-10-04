@@ -256,9 +256,19 @@ remotes = {
 
 The keys are parent paths. Folders along the path are created if they don't exist, and if the folder is already in your project, the remotes are added to it.
 
-## CI
+## CI/CD
 
-**Unit specs** need nothing from Roblox, so they run anywhere, including a Linux CI runner:
+CI can run two of the three kinds of test. Set up Part 1 first; Part 2 is optional.
+
+| What | Runs in CI? | How |
+| --- | --- | --- |
+| Unit specs, including simulated client ↔ server tests | Yes | `lune run test unit` on any runner |
+| Server and shared specs that need the real engine | Yes | `lune run test --cloud` on Roblox's servers |
+| Specs that need a real player, character or UI | No | Studio, on your own machine |
+
+### Part 1: unit tests on every push
+
+Unit specs need nothing from Roblox. Add this file to your repository:
 
 ```yaml
 # .github/workflows/test.yml
@@ -274,37 +284,69 @@ jobs:
       - run: lune run test unit
 ```
 
-**Server and shared specs** can run on Roblox's own servers with `--cloud`, through the Open Cloud [Luau execution API](https://create.roblox.com/docs/cloud/reference/features/luau-execution). No Studio, no window:
+Push it, and every push and pull request runs your unit specs. A failing test fails the check.
 
-```sh
-lune run test --cloud             # unit specs, then e2e specs in the cloud
-lune run test --cloud --dry-run   # print the Open Cloud calls without sending anything
+### Part 2: server specs on Roblox's servers
+
+`--cloud` runs your `tests/e2e/server` and `tests/e2e/shared` specs in an Open Cloud [Luau execution task](https://create.roblox.com/docs/cloud/reference/features/luau-execution): a real Roblox server, with no Studio and no window.
+
+> [!CAUTION]
+> **Do NOT use your production game's Universe ID or Place ID.**
+> **Create a blank place and use its IDs instead.**
+>
+> Your specs run *inside* the experience you configure. A spec that writes to a DataStore, sends a message or calls any other live service does it to that experience for real. Pointed at your production game, a test could overwrite real player data. A blank test experience has nothing to damage.
+
+**Step 1: create a blank test place.** In Roblox Studio: **File → New → Baseplate**, then **File → Publish to Roblox**. Name it something like `MyGame Tests` and keep it private.
+
+**Step 2: copy its two IDs.** On the [Creator Dashboard](https://create.roblox.com/dashboard/creations), click the **⋯** on the test experience: **Copy Universe ID** and **Copy Start Place ID**.
+
+**Step 3: put the IDs in your launcher config** (`.lune/test.luau`):
+
+```lua
+cloud = { universeId = 1234567890, placeId = 9876543210 }, -- the BLANK test place, never production
 ```
 
-What `--cloud` does: it sends the built test content to an Open Cloud task as binary input, the task loads it into its own temporary copy of the place and runs your specs, and LuneTest reads the results from the task's return value. **The place itself is never changed**: nothing is saved or published, and the task's copy is thrown away when it ends.
+**Step 4: create an API key** at [create.roblox.com/dashboard/credentials](https://create.roblox.com/dashboard/credentials):
 
-To set it up:
+1. Click **Create API Key**.
+2. Under **Access Permissions**, add **luau-execution-sessions**.
+3. Inside it, add **only your test experience** and tick **Write**. Leaving your production game off the key means the key can't touch it, even by mistake.
+4. Under **Security**, accept `0.0.0.0/0` so CI machines can use it.
+5. Save and copy the key. Treat it like a password: never commit it, paste it in a chat or put it in a file.
 
-1. Pick a place for the tasks to run in. A separate, empty test experience is best: the task runs inside that experience, so a spec that writes to a DataStore would write to that experience's data.
-2. Create an Open Cloud API key at [create.roblox.com/dashboard/credentials](https://create.roblox.com/dashboard/credentials). Add **luau-execution-sessions**, add your test experience inside it, and tick **Write**. That is the only permission needed.
-3. Put the IDs in the launcher config: `cloud = { universeId = 123, placeId = 456 },`
-4. Give the key to the run as the `ROBLOX_API_KEY` environment variable. Never put it in a file. In GitHub Actions, store it as a secret:
+**Step 5: try it on your machine.** In a terminal:
 
-   ```yaml
-         - run: lune run test --cloud
-           env:
-             ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
-   ```
+```sh
+read -s ROBLOX_API_KEY && export ROBLOX_API_KEY   # paste the key, press Enter (nothing is shown)
+lune run test --cloud
+```
 
-If the run stops with `403 Scope not authorized`, the key doesn't have that experience added under **luau-execution-sessions** with **Write**.
+A line ending in `(cloud)` ran on Roblox's servers:
 
-What a cloud task can and can't do:
+```
+  PASS  [server] Combat/RaycastSpec › ray into empty space hits nothing  (cloud)
+  SKIP  [client] HudSpec  (needs a real client: run it in Studio)
+```
 
-- **It's a bare server.** There are no players and no client, physics doesn't simulate, and your place's own scripts don't start. Specs that work from a cold server pass: real `require`, DataStores, HttpService, engine services.
-- **Client specs are skipped,** and each one is listed as `SKIP` so nothing disappears silently. Specs that assume the game has booted, or need a character, still need Studio.
-- **Lune goes first here too.** Only the specs that fail in Lune are sent to the cloud.
-- **Only the contents of each service are sent.** Service properties (Lighting settings, Workspace gravity and so on) and `StarterPlayer` stay as the host place has them, and Terrain isn't included.
+**Step 6: add it to CI.** Store the key as a repository secret named `ROBLOX_API_KEY` (GitHub: **Settings → Secrets and variables → Actions → New repository secret**), then change the last step of the workflow to:
+
+```yaml
+      - run: lune run test --cloud
+        env:
+          ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
+```
+
+### How `--cloud` works and what it can't do
+
+- **The place is never changed.** The built test content is sent to the task as binary input and loaded into the task's own temporary copy of the place, which is thrown away when the task ends. Nothing is saved or published.
+- **It's a bare server.** No player ever joins, so there is no client, no character and no UI. Physics doesn't simulate, and your game's own scripts don't start, so a spec has to `require` and call what it tests.
+- **Client specs are skipped,** and each is listed as `SKIP` so nothing disappears silently. Run those in Studio with `lune run test`.
+- **Lune goes first here too.** Only specs that fail in Lune are sent to the cloud.
+- **Only the contents of each service are sent.** Service properties (Lighting settings, Workspace gravity and so on) and `StarterPlayer` stay as the test place has them, and Terrain isn't included.
 - **A task can run for 5 minutes at most.**
+- **`lune run test --cloud --dry-run`** prints the Open Cloud calls without sending anything.
+
+If the run stops with `403 Scope not authorized`, the key doesn't have the test experience added under **luau-execution-sessions** with **Write**.
 
 ## AI coding agents
 
@@ -337,7 +379,7 @@ The config is the table at the top of `.lune/test.luau`:
 | `startTimeout` | `90` | Seconds Studio gets to enter Play before the test place is reopened once |
 | `port` | `44774` | First port tried for Studio's results. If it's taken, the next free one is used. |
 | `remotes` | none | See [Remotes table](#remotes-table) |
-| `cloud` | none | `{ universeId, placeId }` of the test place `--cloud` uses. See [CI](#ci) |
+| `cloud` | none | `{ universeId, placeId }` of a **blank test place** for `--cloud`. Never your production game. See [CI/CD](#cicd) |
 | `fallback` | `true` | Try e2e specs in Lune first and send only the failures to Studio |
 
 If your project is a library, meaning its tree isn't a `DataModel`, LuneTest mounts it at `ReplicatedStorage.<project name>`.

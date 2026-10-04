@@ -375,7 +375,10 @@ local OPEN_CLOUD = process.env.LUNETEST_OPEN_CLOUD_URL or "https://apis.roblox.c
 local function runCloud(config: Config, dryRun: boolean): Results
 	local cloud = config.cloud
 	if not cloud then
-		return fail("`--cloud` needs `cloud = { universeId = ..., placeId = ... }` in your test launcher")
+		return fail(
+			"`--cloud` needs `cloud = { universeId = ..., placeId = ... }` in your test launcher. "
+				.. "Use a BLANK test place, never your production game: specs run inside that experience"
+		)
 	end
 	local key = process.env.ROBLOX_API_KEY
 	if not key and not dryRun then
