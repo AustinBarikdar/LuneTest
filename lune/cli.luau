@@ -458,9 +458,11 @@ local function runCloud(config: Config, dryRun: boolean): Results
 	end
 
 	info(`cloud task: {job.path}`)
-	local elapsed = 0
+	-- Timed by the clock, not by summing task.wait(): Lune under-reports waits on Windows.
+	local pollStart, elapsed = os.clock(), 0
 	while job.state ~= "COMPLETE" and job.state ~= "FAILED" and job.state ~= "CANCELLED" and elapsed < timeout + 60 do
-		elapsed += task.wait(2)
+		task.wait(2)
+		elapsed = os.clock() - pollStart
 		job = call("GET", `{OPEN_CLOUD}/cloud/v2/{job.path}`)
 	end
 	local results = job.state == "COMPLETE" and job.output and job.output.results and job.output.results[1]
@@ -738,11 +740,13 @@ local function run(config: Config)
 		closeStudio()
 		info("running in Studio (in the background)...")
 		openStudio()
+		local waitStart = os.clock()
 		local elapsed, opens, nextCheck, nextFocus = 0, 1, 8, 0
 		local ours: { string } = {}
 		local startDeadline: number? = config.startTimeout or 90
 		while received == nil and elapsed < timeout do
-			elapsed += task.wait(0.1)
+			task.wait(0.1)
+			elapsed = os.clock() - waitStart -- the clock: Lune under-reports waits on Windows
 			-- Studio brings itself to the front a few times while it loads, whatever it was
 			-- told at launch. Each time, hide it again: that takes its window off screen and
 			-- gives the front back to the app the user was in. (NSRunningApplication.hide
