@@ -3,6 +3,36 @@
 --   lune run DevPackages/_Index/<scope>_lunetest@<version>/lunetest/lune/init.luau
 -- Never overwrites anything that already exists; safe to re-run.
 
+-- LuneTest needs Lune 0.10 or newer. This runs before anything else and uses only what old
+-- Lune versions have, so an old pin gets fixed with a clear message instead of an
+-- obscure crash further down.
+do
+	local fs = require("@lune/fs")
+	local process = require("@lune/process")
+	local major, minor = string.match(_VERSION, "Lune (%d+)%.(%d+)")
+	if major and tonumber(major) == 0 and (tonumber(minor) or 0) < 10 then
+		local fixed: string? = nil
+		for _, manifest in { "rokit.toml", "aftman.toml" } do
+			if not fixed and fs.isFile(manifest) then
+				local updated, count = string.gsub(fs.readFile(manifest), '(lune%s*=%s*"[^"@]+@)[%d%.]+"', '%10.10.5"')
+				if count > 0 then
+					fs.writeFile(manifest, updated)
+					fixed = manifest
+				end
+			end
+		end
+		print(`LuneTest needs Lune 0.10 or newer, and this project runs {string.match(_VERSION, "Lune [%d%.]+")}.`)
+		if fixed then
+			print(`Updated {fixed} to Lune 0.10.5. Now run:  rokit install   (or: aftman install)`)
+			print("Then run this command again.")
+		else
+			print('Set  lune = "lune-org/lune@0.10.5"  in rokit.toml or aftman.toml, run  rokit install,')
+			print("then run this command again.")
+		end
+		process.exit(1)
+	end
+end
+
 local fs = require("@lune/fs")
 local stdio = require("@lune/stdio")
 
@@ -16,6 +46,10 @@ local LAUNCHER = [[
 --   lune run test e2e             end-to-end specs only (Studio play session)
 --   lune run test unit Economy    only tests whose name contains "Economy"
 local fs = require("@lune/fs")
+
+if string.match(_VERSION, "Lune 0%.%d[^%d]") then
+	error('LuneTest needs Lune 0.10 or newer: set  lune = "lune-org/lune@0.10.5"  in rokit.toml or aftman.toml and run  rokit install', 0)
+end
 
 local config = {
 	project = "default.project.json", -- your normal Rojo project; tests are injected into a copy

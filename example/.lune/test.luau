@@ -6,6 +6,10 @@
 --   lune run test unit Economy    only tests whose name contains "Economy"
 local fs = require("@lune/fs")
 
+if string.match(_VERSION, "Lune 0%.%d[^%d]") then
+	error('LuneTest needs Lune 0.10 or newer: set  lune = "lune-org/lune@0.10.5"  in rokit.toml or aftman.toml and run  rokit install', 0)
+end
+
 local config = {
 	project = "default.project.json", -- your normal Rojo project; tests are injected into a copy
 	unit = "tests/unit", -- fast specs, run inside Lune; subfolders are groups

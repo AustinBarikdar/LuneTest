@@ -137,7 +137,7 @@ The exit code is 0 when everything passes and 1 when something fails, so it work
 
 ## Requirements
 
-- [Rojo](https://rojo.space) 7, [Lune](https://lune-org.github.io/docs) 0.10+ and [Wally](https://wally.run). With [Rokit](https://github.com/rojo-rbx/rokit): `rokit init` (if the project has no `rokit.toml` yet), then `rokit add rojo`, `rokit add lune`, `rokit add wally`.
+- [Rojo](https://rojo.space) 7, [Lune](https://lune-org.github.io/docs) **0.10 or newer** and [Wally](https://wally.run). If your project pins an older Lune, LuneTest's setup updates the pin for you and tells you to run `rokit install`. With [Rokit](https://github.com/rojo-rbx/rokit): `rokit init` (if the project has no `rokit.toml` yet), then `rokit add rojo`, `rokit add lune`, `rokit add wally`.
 - For e2e specs only: Roblox Studio on macOS or Windows, signed in.
 
 ## Setup
@@ -511,6 +511,8 @@ If your project is a library, meaning its tree isn't a `DataModel`, LuneTest mou
 
 - **`no results from Studio`**: check Studio's Output window. The runners print `[LuneTest] N passed, M failed` when they finish.
 - **A unit spec says something `is not a valid member`**: that's engine behavior Lune doesn't have. Move the spec to `tests/e2e`.
+- **Every `lune` command prints `ERROR No such file or directory (os error 2)`**, even `lune --version`: your project pins a Lune version that isn't installed on this machine, so Lune itself can't start and LuneTest never runs. Open `rokit.toml` or `aftman.toml` in the project, set `lune = "lune-org/lune@0.10.5"`, then run `rokit install`.
+- **"LuneTest needs Lune 0.10 or newer"**: the project pins an older Lune. LuneTest has already updated the pin in `rokit.toml` or `aftman.toml` for you. Run `rokit install` (or `aftman install`), then run your command again.
 - **`Aftman error: ... no aftman.toml files list this tool`**: an old Aftman install is ahead of Rokit on your `PATH`, and Aftman doesn't read `rokit.toml`. Move Rokit's `bin` folder (`~/.rokit/bin`) above Aftman's in `PATH`, then open a new terminal.
 - **The first e2e run takes a minute or more**: Studio was updating itself before it opened the place. Later runs are back to a few seconds.
 
