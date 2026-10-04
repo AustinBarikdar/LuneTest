@@ -13,7 +13,11 @@ local serverSpecs = ServerScriptService:FindFirstChild("LuneTestSpecs")
 
 local options = LuneTest.optionsFrom(specs)
 -- IPv4 loopback: Windows "localhost" can stall trying IPv6 first.
-local resultsUrl = `http://127.0.0.1:{specs:GetAttribute("Port")}/results`
+local harnessUrl = `http://127.0.0.1:{specs:GetAttribute("Port")}`
+local resultsUrl = `{harnessUrl}/results`
+
+-- Tells the harness that Play really started, so it can tell "slow" from "never started".
+task.spawn(pcall, HttpService.PostAsync, HttpService, `{harnessUrl}/started`, tostring(specs:GetAttribute("RunId")))
 local clientTimeout = (specs:GetAttribute("ClientTimeout") :: number?) or 90
 
 -- Parented and connected in the same frame, so the client can never fire into the void.

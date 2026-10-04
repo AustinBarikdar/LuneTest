@@ -32,6 +32,7 @@ export type Config = {
 	timeout: number?, -- seconds to wait for Studio; default 300
 	testTimeout: number?, -- seconds before one test counts as hung; default 30
 	clientTimeout: number?, -- seconds the Studio client gets to start; default 90
+	startTimeout: number?, -- seconds Studio gets to enter Play before the place is reopened; default 90
 	-- Remotes to create in the test place, by parent path:
 	--   { ["ReplicatedStorage.Remotes"] = { "Chat", GetData = "RemoteFunction" } }
 	-- A bare name is a RemoteEvent.
@@ -65,6 +66,7 @@ local ownsLock = false
 local LUNE_WAIT = 2
 
 local cli = {}
+cli.packageDir = PACKAGE_DIR
 
 local function info(message: string)
 	stdio.write(`[lunetest] {message}\n`)
@@ -345,14 +347,16 @@ local function lockHeldByLiveRun(): boolean
 end
 
 -- Binds the first free port from `first`, so two projects can test at the same time.
-local function listen(first: number, handler: (any) -> any): (number, any)
+-- Returns nil when no port can be opened at all (e.g. a sandboxed AI agent): only Studio
+-- needs the listener, so unit runs carry on without it.
+local function listen(first: number, handler: (any) -> any): (number?, any)
 	for port = first, first + 20 do
 		local ok, handle = pcall(net.serve, port, handler)
 		if ok then
 			return port, handle
 		end
 	end
-	return fail(`no free port between {first} and {first + 20}`)
+	return nil, nil
 end
 
 local function run(config: Config)
@@ -377,6 +381,7 @@ local function run(config: Config)
 	-- Results are only accepted from this run (stale or foreign Studios are ignored).
 	local runId = `{os.time()}-{math.random(1, 1e9)}`
 	local received: Results? = nil
+	local playStarted = false
 	local port, server = listen(config.port or 44774, function(request)
 		if request.method == "POST" and request.path == "/results" then
 			local ok, results = pcall(function()
@@ -388,18 +393,25 @@ local function run(config: Config)
 			end
 			return { status = 400, body = "not for this run" }
 		end
+		if request.method == "POST" and request.path == "/started" then
+			playStarted = playStarted or request.body == runId
+			return { status = 200, body = "ok" }
+		end
 		if request.method == "GET" and request.path == "/alive" then
 			return { status = 200, body = runId }
 		end
 		return { status = 404, body = "not found" }
 	end)
-	fs.writeFile(LOCK_FILE, serde.encode("json", { port = port, runId = runId }))
-	ownsLock = true
+	if server then
+		-- The lock is "live" only while this port answers, so no port means no lock.
+		fs.writeFile(LOCK_FILE, serde.encode("json", { port = port, runId = runId }))
+		ownsLock = true
+	end
 
 	local attributes = {
 		AutoPlay = true,
 		RunId = runId,
-		Port = port,
+		Port = port or 0,
 		TestTimeout = config.testTimeout or 30,
 		ClientTimeout = config.clientTimeout or 90,
 		Filters = if #filters > 0 then table.concat(filters, "\n") else nil,
@@ -540,19 +552,36 @@ local function run(config: Config)
 		end
 	end
 
+	if needStudio and not server then
+		fail(
+			"these specs need Roblox Studio, but no local port could be opened for Studio to report back "
+				.. "(ports are blocked, e.g. by a sandbox). Unit specs are unaffected: `lune run test unit`"
+		)
+	end
 	if needStudio then
 		local timeout = config.timeout or 300
 		local alreadyRunning = studioRunning()
-		if cli.installPlugin() and alreadyRunning then
-			fail("updated the LuneTest Studio plugin, but the open Studio won't load it until restarted. Close Studio and run again")
-		end
+		-- Each test place opens in its own Studio process, which reads the plugin fresh, so
+		-- an updated plugin takes effect even while other Studio windows are open.
+		cli.installPlugin()
 
 		closeStudio(false)
 		info("running in Studio...")
 		openStudio()
 		local elapsed, opens, nextCheck = 0, 1, 8
+		local startDeadline: number? = config.startTimeout or 90
 		while received == nil and elapsed < timeout do
 			elapsed += task.wait(0.1)
+			-- Studio can accept the plugin's request to start Play and then never start it,
+			-- and that window can't be recovered. Close it and open a fresh one, once.
+			if startDeadline and not playStarted and elapsed >= startDeadline then
+				startDeadline = nil
+				info("Studio opened but Play never started; reopening the test place...")
+				closeStudio(not alreadyRunning)
+				alreadyRunning = studioRunning()
+				openStudio()
+				nextCheck = elapsed + 8
+			end
 			-- macOS race: right after a Studio quits, `open` can hand the file to the dying
 			-- app and nothing launches. No Studio process at all means it was lost; reopen.
 			-- Checked every 2s, not every tick: `ps` is a process spawn and Studio is booting.
@@ -574,7 +603,9 @@ local function run(config: Config)
 	elseif mode == "e2e" and e2eSpecs == 0 then
 		info("no e2e specs found")
 	end
-	server.stop()
+	if server then
+		server.stop()
+	end
 
 	local color: "red" | "green" = if total.failed > 0 then "red" else "green"
 	stdio.write(
