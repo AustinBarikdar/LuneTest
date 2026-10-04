@@ -26,8 +26,9 @@ local config = {
 	fallback = true, -- try e2e specs in Lune first; only the ones that fail there run in Studio
 
 	-- For CI: `lune run test --cloud` runs server and shared specs on Roblox's servers.
-	-- !! Use the IDs of a BLANK test place, NEVER your production game: specs run inside
-	-- !! that experience, so a spec that writes a DataStore would write real player data.
+	-- !! Use the IDs of a BLANK test place, NEVER your production game. Specs run inside
+	-- !! that experience and can overwrite its live data: a spec that writes a DataStore
+	-- !! changes real saved data. (The place itself is never modified.)
 	-- The API key goes in the ROBLOX_API_KEY environment variable, never in this file.
 	-- cloud = { universeId = 0, placeId = 0 },
 

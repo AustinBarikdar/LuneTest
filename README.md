@@ -294,7 +294,9 @@ Push it, and every push and pull request runs your unit specs. A failing test fa
 > **Do NOT use your production game's Universe ID or Place ID.**
 > **Create a blank place and use its IDs instead.**
 >
-> Your specs run *inside* the experience you configure. A spec that writes to a DataStore, sends a message or calls any other live service does it to that experience for real. Pointed at your production game, a test could overwrite real player data. A blank test experience has nothing to damage.
+> **Your tests can overwrite live data.** Specs run *inside* the experience you configure, with full access to its DataStores, MemoryStores and messaging. A spec that calls `SetAsync` or `RemoveAsync` changes that experience's saved data for real, and it stays changed after the test ends. Pointed at your production game, a test could overwrite or delete real player data.
+>
+> The place itself is not overwritten: `--cloud` never saves or publishes anything to it. The risk is the experience's data, and a blank test experience has none to lose.
 
 **Step 1: create a blank test place.** In Roblox Studio: **File → New → Baseplate**, then **File → Publish to Roblox**. Name it something like `MyGame Tests` and keep it private.
 
