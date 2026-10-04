@@ -121,7 +121,10 @@ local function writeTestProject(config: Config, attributes: { [string]: any }): 
 	if not fs.isFile(projectPath) then
 		fail(`{projectPath} not found; set \`project\` in your test launcher`)
 	end
-	local project = serde.decode("json", fs.readFile(projectPath))
+	local okProject, project = pcall(serde.decode, "json" :: "json", fs.readFile(projectPath))
+	if not okProject or type(project) ~= "table" or type(project.tree) ~= "table" then
+		fail(`{projectPath} isn't a valid Rojo project: {if okProject then "it has no \"tree\"" else string.match(tostring(project), "[^\n]+")}`)
+	end
 
 	-- A library project (not a whole place) gets mounted under ReplicatedStorage.
 	local tree = project.tree
@@ -352,7 +355,7 @@ local function listen(first: number, handler: (any) -> any): (number, any)
 	return fail(`no free port between {first} and {first + 20}`)
 end
 
-function cli.run(config: Config)
+local function run(config: Config)
 	local started = DateTime.now().unixTimestampMillis
 	local mode = "all"
 	local filters = {}
@@ -448,7 +451,13 @@ function cli.run(config: Config)
 		local okCache, cacheFile = pcall(function()
 			return serde.decode("json", fs.readFile(CACHE_FILE))
 		end)
-		if not fresh and okCache and type(cacheFile) == "table" and cacheFile.version == CACHE_VERSION then
+		if
+			not fresh
+			and okCache
+			and type(cacheFile) == "table"
+			and cacheFile.version == CACHE_VERSION
+			and type(cacheFile.studio) == "table"
+		then
 			cached = cacheFile.studio
 		end
 
@@ -483,8 +492,10 @@ function cli.run(config: Config)
 				return LuneTest.run(bucket.folder, bucket.label, options)
 			end)
 			local failedSpecs = {}
+			local ranSpecs = {}
 			if ok then
 				for _, entry in results.log do
+					ranSpecs[entry.spec] = true
 					if entry.status == "fail" then
 						failedSpecs[entry.spec] = true
 					end
@@ -499,14 +510,18 @@ function cli.run(config: Config)
 				-- The attempt itself broke (e.g. a network handler error): Studio decides all of it.
 				for _, name in attempt do
 					failedSpecs[name] = true
+					ranSpecs[name] = true
 				end
 			end
 			for name in failedSpecs do
 				table.insert(fallBack, name)
 			end
-			-- Remember this run's verdicts; specs that passed in Lune are forgotten.
+			-- Remember this run's verdicts; specs that passed in Lune are forgotten. A spec the
+			-- filters skipped entirely ran nothing, so it proved nothing: keep its entry.
 			for _, name in attempt do
-				cached[name] = if failedSpecs[name] then hashes[name] else nil
+				if ranSpecs[name] then
+					cached[name] = if failedSpecs[name] then hashes[name] else nil
+				end
 			end
 		end
 		pcall(fs.writeFile, CACHE_FILE, serde.encode("json", { version = CACHE_VERSION, studio = cached }))
@@ -570,6 +585,17 @@ function cli.run(config: Config)
 	)
 	pcall(fs.removeFile, LOCK_FILE)
 	process.exit(if total.failed > 0 then 1 else 0)
+end
+
+function cli.run(config: Config)
+	-- The results listener keeps Lune alive, so an uncaught error here would hang the
+	-- run forever with the lock held. Report it and exit instead.
+	local ok, err = xpcall(run :: (...any) -> ...any, function(e)
+		return debug.traceback(tostring(e), 2) -- tostring: Lune errors aren't always strings
+	end, config)
+	if not ok then
+		fail(`internal error, please report it:\n{err}`)
+	end
 end
 
 return cli
