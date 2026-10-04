@@ -457,6 +457,7 @@ local function runCloud(config: Config, dryRun: boolean): Results
 		return { passed = 0, failed = 0, log = {} }
 	end
 
+	info(`cloud task: {job.path}`)
 	local elapsed = 0
 	while job.state ~= "COMPLETE" and job.state ~= "FAILED" and job.state ~= "CANCELLED" and elapsed < timeout + 60 do
 		elapsed += task.wait(2)

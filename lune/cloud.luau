@@ -12,8 +12,12 @@ local ServerScriptService = game:GetService("ServerScriptService")
 -- The test content arrives as the task's binary input: one Folder per service, named
 -- after it, holding that service's children. Move them into this task's DataModel.
 -- Nothing here is saved; the DataModel is discarded when the task ends.
+-- print() goes to the task's log, which the CLI shows if the task fails or stalls.
 local input = ({ ... })[1]
-for _, folder in SerializationService:DeserializeInstancesAsync(input.BinaryInput) do
+print("[LuneTest] loading test content")
+local folders = SerializationService:DeserializeInstancesAsync(input.BinaryInput)
+print(`[LuneTest] loaded {#folders} services`)
+for _, folder in folders do
 	local service = (game :: any):GetService(folder.Name)
 	for _, child in folder:GetChildren() do
 		local existing = service:FindFirstChild(child.Name)
@@ -24,8 +28,14 @@ for _, folder in SerializationService:DeserializeInstancesAsync(input.BinaryInpu
 	end
 end
 
-local LuneTest = require(ReplicatedStorage:WaitForChild("LuneTest") :: ModuleScript)
-local specs = ReplicatedStorage:WaitForChild("LuneTestSpecs")
+-- FindFirstChild, not WaitForChild: nothing else will add these, so waiting would only
+-- stall the task until it times out.
+local runtime = ReplicatedStorage:FindFirstChild("LuneTest")
+local specs = ReplicatedStorage:FindFirstChild("LuneTestSpecs")
+if not runtime or not specs then
+	error("the test content did not load: ReplicatedStorage.LuneTest or LuneTestSpecs is missing")
+end
+local LuneTest = require(runtime :: ModuleScript)
 local serverSpecs = ServerScriptService:FindFirstChild("LuneTestSpecs")
 local options = LuneTest.optionsFrom(specs)
 
@@ -36,8 +46,11 @@ local function merge(results: any)
 	table.move(results.log, 1, #results.log, #merged.log + 1, merged.log)
 end
 
+print("[LuneTest] running server specs")
 merge(LuneTest.run(serverSpecs and serverSpecs:FindFirstChild("Server"), "[server] ", options))
+print("[LuneTest] running shared specs")
 merge(LuneTest.run(specs:FindFirstChild("Shared"), "[shared] ", options))
+print(`[LuneTest] {merged.passed} passed, {merged.failed} failed`)
 
 -- The task's return value is how results get back: Open Cloud serializes it to JSON.
 return merged
