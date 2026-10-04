@@ -22,7 +22,7 @@ There are two kinds of test:
 | **unit** | `tests/unit/` | Inside Lune, against your Rojo-built place. No Studio. | milliseconds |
 | **e2e** | `tests/e2e/{server,client,shared}/` | Tried in Lune first. Any spec that fails there is rerun in a real Studio Play session. | Instant if Lune passes, ~8s if Studio is needed |
 
-Studio only opens when at least one e2e spec actually needs it. When the run is over, the test place closes. If LuneTest launched Studio, Studio quits too.
+Studio only opens when at least one e2e spec actually needs it. It runs in the background in its own instance, and that instance closes when the run is over. A Studio you already have open is left alone.
 
 The exit code is 0 when everything passes and 1 when something fails, so it works in scripts and CI.
 
@@ -300,7 +300,7 @@ If your project is a library, meaning its tree isn't a `DataModel`, LuneTest mou
 - **Parallel runs:** if the port is taken, the next free one is used, so two projects can run at the same time. Each run only ever closes its own test place, never another project's or a place you have open.
 - **One run per project:** a second `lune run test` in the same project stops right away instead of fighting over the test place and Studio windows. A lock left behind by a crashed or Ctrl+C'd run is detected and taken over automatically.
 - **Updated plugin:** every test place opens in its own Studio process, which loads the plugin fresh. An updated plugin takes effect on the next run, even with other Studio windows open.
-- **Back-to-back runs on macOS:** if `open` hands the place to a Studio that's still quitting and nothing launches, LuneTest notices and opens it again.
+- **Studio stays out of your way (macOS):** the test place opens in its own Studio instance, in the background, separate from any Studio you have open. Studio still brings itself to the front briefly while it boots; LuneTest hides it again each time, so it's on screen for a second or two instead of the whole run. Your own Studio windows are never touched.
 
 ## Troubleshooting
 

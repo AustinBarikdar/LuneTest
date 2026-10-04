@@ -229,24 +229,19 @@ local function loadPlace(waitTimeout: number): (any, (any) -> any, any)
 	return game, requireModule, network
 end
 
--- macOS: { pid, args } for every Studio process. Each place opened while Studio is
--- already running gets its own child process with `-localPlaceFile <path>`.
-local function studioProcesses(): { { pid: string, args: string } }
+-- macOS: pids of the Studio instances running our test place. It always gets its own
+-- instance (see openStudio), identified by `-localPlaceFile <path>` on its command line,
+-- so the user's own Studio windows are never involved.
+local function ourStudioPids(): { string }
 	local out = {}
+	local target = `-localPlaceFile {absolute(PLACE_FILE)}`
 	for line in string.gmatch(process.exec("ps", { "-axo", "pid=,args=" }).stdout, "[^\n]+") do
 		local pid, args = string.match(line, "^%s*(%d+)%s+(.*)$")
-		if pid and args and (string.match(args, "MacOS/RobloxStudio$") or string.find(args, "MacOS/RobloxStudio ", 1, true)) then
-			table.insert(out, { pid = pid, args = args })
+		if pid and args and string.find(args, "MacOS/RobloxStudio", 1, true) and string.find(args, target, 1, true) then
+			table.insert(out, pid)
 		end
 	end
 	return out
-end
-
-local function studioRunning(): boolean
-	if IS_WINDOWS then
-		return string.find(process.exec("tasklist", {}).stdout, "RobloxStudio", 1, true) ~= nil
-	end
-	return #studioProcesses() > 0
 end
 
 -- Studio ignores SIGTERM but exits cleanly on SIGHUP; SIGKILL only if it hangs.
@@ -261,9 +256,8 @@ local function terminate(pid: string)
 	process.exec("kill", { "-9", pid })
 end
 
--- Closes the LuneTest place. `quitStudio` also quits Studio itself when we launched it
--- and nothing else is open in it, so unsaved work in your other places is never touched.
-local function closeStudio(quitStudio: boolean)
+-- Closes the test place, and only the test place.
+local function closeStudio()
 	if IS_WINDOWS then
 		-- Every place is its own Studio process with the place path on its command line.
 		-- Matched by full path (not window title, which is blank while Studio loads), so
@@ -276,19 +270,8 @@ local function closeStudio(quitStudio: boolean)
 		})
 		return
 	end
-	local target = `-localPlaceFile {absolute(PLACE_FILE)}`
-	local main, otherPlaces = nil, 0
-	for _, studio in studioProcesses() do
-		if string.find(studio.args, target, 1, true) then
-			terminate(studio.pid)
-		elseif string.find(studio.args, "-localPlaceFile", 1, true) then
-			otherPlaces += 1
-		elseif string.match(studio.args, "MacOS/RobloxStudio$") then
-			main = studio.pid -- a cold start opens our place in here
-		end
-	end
-	if quitStudio and main and otherPlaces == 0 then
-		terminate(main)
+	for _, pid in ourStudioPids() do
+		terminate(pid)
 	end
 end
 
@@ -296,10 +279,29 @@ local function openStudio()
 	if IS_WINDOWS then
 		process.exec("cmd", { "/c", "start", "", PLACE_FILE })
 	elseif fs.isDir("/Applications/RobloxStudio.app") then
-		process.exec("open", { "-a", "/Applications/RobloxStudio.app", PLACE_FILE })
+		-- A separate instance (-n), in the background (-g) and hidden (-j): the run doesn't
+		-- depend on, or disturb, a Studio the user already has open.
+		process.exec("open", {
+			"-n",
+			"-g",
+			"-j",
+			"-a",
+			"/Applications/RobloxStudio.app",
+			"--args",
+			"-task",
+			"EditFile",
+			"-localPlaceFile",
+			absolute(PLACE_FILE),
+		})
 	else
-		process.exec("open", { PLACE_FILE })
+		process.exec("open", { "-g", PLACE_FILE })
 	end
+end
+
+-- macOS: pid of the frontmost app. Needs no special permission.
+local function frontPid(): string?
+	local out = process.exec("sh", { "-c", 'lsappinfo info -only pid "$(lsappinfo front)"' }).stdout
+	return string.match(out, '"pid"=(%d+)')
 end
 
 local function printResults(results: Results, where: string?)
@@ -560,34 +562,53 @@ local function run(config: Config)
 	end
 	if needStudio then
 		local timeout = config.timeout or 300
-		local alreadyRunning = studioRunning()
 		-- Each test place opens in its own Studio process, which reads the plugin fresh, so
 		-- an updated plugin takes effect even while other Studio windows are open.
 		cli.installPlugin()
 
-		closeStudio(false)
-		info("running in Studio...")
+		closeStudio()
+		info("running in Studio (in the background)...")
 		openStudio()
-		local elapsed, opens, nextCheck = 0, 1, 8
+		local elapsed, opens, nextCheck, nextFocus = 0, 1, 8, 0
+		local ours: { string } = {}
 		local startDeadline: number? = config.startTimeout or 90
 		while received == nil and elapsed < timeout do
 			elapsed += task.wait(0.1)
+			-- Studio brings itself to the front a few times while it loads, whatever it was
+			-- told at launch. Each time, hide it again: that takes its window off screen and
+			-- gives the front back to the app the user was in. (NSRunningApplication.hide
+			-- needs no Accessibility permission. Hiding it continuously, or running Studio
+			-- with Qt's offscreen platform, was tried: the first fights Studio's startup and
+			-- the second crashes it.)
+			if not IS_WINDOWS and elapsed >= nextFocus then
+				nextFocus = elapsed + 0.15
+				if #ours == 0 then
+					ours = ourStudioPids()
+				end
+				local pid = frontPid()
+				if pid and table.find(ours, pid) then
+					process.exec("osascript", {
+						"-l",
+						"JavaScript",
+						"-e",
+						`ObjC.import("AppKit"); $.NSRunningApplication.runningApplicationWithProcessIdentifier({pid}).hide`,
+					})
+				end
+			end
 			-- Studio can accept the plugin's request to start Play and then never start it,
 			-- and that window can't be recovered. Close it and open a fresh one, once.
 			if startDeadline and not playStarted and elapsed >= startDeadline then
 				startDeadline = nil
 				info("Studio opened but Play never started; reopening the test place...")
-				closeStudio(not alreadyRunning)
-				alreadyRunning = studioRunning()
+				closeStudio()
 				openStudio()
 				nextCheck = elapsed + 8
 			end
-			-- macOS race: right after a Studio quits, `open` can hand the file to the dying
-			-- app and nothing launches. No Studio process at all means it was lost; reopen.
+			-- If the launch got lost and no Studio is running our place, open it again.
 			-- Checked every 2s, not every tick: `ps` is a process spawn and Studio is booting.
 			if not IS_WINDOWS and opens < 3 and elapsed >= nextCheck then
 				nextCheck = elapsed + 2
-				if #studioProcesses() == 0 then
+				if #ourStudioPids() == 0 then
 					opens += 1
 					nextCheck = elapsed + 8
 					info("Studio didn't start, opening again...")
@@ -595,7 +616,7 @@ local function run(config: Config)
 				end
 			end
 		end
-		closeStudio(not alreadyRunning)
+		closeStudio()
 		if received == nil then
 			fail(`no results from Studio after {timeout}s; check Studio's Output window`)
 		end
