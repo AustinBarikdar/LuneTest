@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LuneTest · Test your Roblox game from the terminal</title>
+<meta name="description" content="A Roblox testing framework for Rojo projects. Unit tests in milliseconds without Studio, end-to-end tests in real Studio, and server tests in CI on Roblox's own servers.">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<style>
+:root {
+	--bg: #0a0f24;
+	--bg-raised: #111836;
+	--bg-code: #070b1c;
+	--line: #232c57;
+	--text: #e8ebf7;
+	--muted: #9aa3c7;
+	--moon: #f4e9c1;
+	--pass: #4ade80;
+	--fail: #f87171;
+	--skip: #fbbf24;
+	--link: #9db4ff;
+	--danger-bg: #2a1118;
+	--danger-line: #f87171;
+	--radius: 14px;
+	--mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+	--sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+}
+@media (prefers-color-scheme: light) {
+	:root {
+		--bg: #f7f6f1;
+		--bg-raised: #ffffff;
+		--bg-code: #10162f;
+		--line: #dedbd0;
+		--text: #171b33;
+		--muted: #5a6182;
+		--moon: #b98a1e;
+		--link: #2f49c9;
+		--danger-bg: #fdecec;
+		--danger-line: #d93636;
+	}
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font: 16px/1.6 var(--sans);
+	-webkit-font-smoothing: antialiased;
+}
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, pre, kbd { font-family: var(--mono); }
+pre { tab-size: 2; }
+:not(pre) > code {
+	font-size: .88em;
+	padding: .12em .4em;
+	border-radius: 6px;
+	background: color-mix(in srgb, var(--text) 9%, transparent);
+}
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+
+/* nav */
+nav { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(10px); background: color-mix(in srgb, var(--bg) 82%, transparent); border-bottom: 1px solid var(--line); }
+nav .wrap { display: flex; align-items: center; gap: 22px; height: 58px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text); letter-spacing: -.01em; }
+.brand img { width: 28px; height: 28px; }
+nav .links { margin-left: auto; display: flex; gap: 20px; font-size: .93rem; }
+nav .links a { color: var(--muted); }
+nav .links a:hover { color: var(--text); text-decoration: none; }
+nav .gh { color: var(--text) !important; border: 1px solid var(--line); padding: 5px 12px; border-radius: 999px; }
+@media (max-width: 640px) { nav .links a:not(.gh) { display: none; } }
+
+/* hero */
+.hero { padding: 76px 20px 34px; text-align: center; }
+.hero img { width: 84px; height: 84px; }
+h1 { font-size: clamp(2.1rem, 6vw, 3.5rem); line-height: 1.08; letter-spacing: -.035em; margin: 20px 0 16px; }
+h1 em { font-style: normal; color: var(--moon); }
+.lede { max-width: 640px; margin: 0 auto 30px; color: var(--muted); font-size: 1.12rem; }
+
+/* command box with OS tabs */
+.cmd { max-width: 860px; margin: 0 auto; text-align: left; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-code); overflow: hidden; }
+.tabs { display: flex; align-items: center; gap: 4px; padding: 8px 8px 0; }
+.tabs button { font: 600 .82rem var(--sans); color: #9aa3c7; background: none; border: 0; padding: 7px 12px; border-radius: 8px 8px 0 0; cursor: pointer; }
+.tabs button[aria-selected="true"] { color: #e8ebf7; background: #151c40; }
+.tabs .note { margin-left: auto; padding-right: 8px; font-size: .78rem; color: #6f79a6; }
+@media (max-width: 640px) { .tabs .note { display: none; } .hero { padding-top: 48px; } }
+.cmd pre { margin: 0; padding: 16px 70px 16px 18px; background: #151c40; color: #e8ebf7; font-size: .8rem; white-space: pre-wrap; overflow-wrap: anywhere; position: relative; }
+.cmd .row { position: relative; }
+.copy { position: absolute; top: 9px; right: 9px; border: 1px solid #2b3568; background: #0d1330; color: #9aa3c7; font: 600 .74rem var(--sans); padding: 5px 9px; border-radius: 7px; cursor: pointer; }
+.copy:hover { color: #fff; }
+.after { text-align: center; margin: 14px 0 0; color: var(--muted); font-size: .93rem; }
+
+/* terminal */
+.term { max-width: 860px; margin: 46px auto 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-code); box-shadow: 0 30px 80px -40px #000; overflow: hidden; text-align: left; }
+.term .bar { display: flex; gap: 7px; padding: 12px 14px; border-bottom: 1px solid #1b2347; }
+.term .bar i { width: 11px; height: 11px; border-radius: 50%; background: #2b3568; }
+.term pre { margin: 0; padding: 18px 20px 22px; color: #c9d1f5; font-size: .82rem; line-height: 1.75; overflow-x: auto; }
+.p { color: #7d88b8; } .ok { color: var(--pass); font-weight: 700; } .no { color: var(--fail); font-weight: 700; } .sk { color: var(--skip); font-weight: 700; } .dim { color: #6f79a6; } .hl { color: #f4e9c1; }
+
+/* sections */
+section { padding: 70px 0 10px; }
+h2 { font-size: clamp(1.5rem, 3.4vw, 2.05rem); letter-spacing: -.025em; margin: 0 0 8px; }
+.sub { color: var(--muted); margin: 0 0 30px; max-width: 680px; }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-raised); padding: 22px; }
+.card h3 { margin: 0 0 6px; font-size: 1.06rem; letter-spacing: -.01em; }
+.card p { margin: 0; color: var(--muted); font-size: .95rem; }
+.card .tag { display: inline-block; font: 700 .72rem var(--mono); letter-spacing: .04em; padding: 3px 9px; border-radius: 999px; margin-bottom: 12px; border: 1px solid currentColor; }
+.t-unit { color: var(--pass); } .t-e2e { color: var(--link); } .t-cloud { color: var(--moon); }
+.card .where { margin-top: 12px; font: .8rem var(--mono); color: var(--muted); }
+
+.flow { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); counter-reset: step; }
+.flow div { border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: var(--bg-raised); font-size: .93rem; color: var(--muted); }
+.flow div::before { counter-increment: step; content: counter(step); display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: color-mix(in srgb, var(--moon) 22%, transparent); color: var(--moon); font: 700 .82rem var(--mono); margin-bottom: 10px; }
+.flow b { color: var(--text); display: block; margin-bottom: 2px; }
+
+.split { display: grid; gap: 22px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); align-items: start; }
+pre.code { margin: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-code); color: #c9d1f5; padding: 18px 20px; font-size: .82rem; line-height: 1.7; overflow-x: auto; }
+.k { color: #c4a7ff; } .s { color: #a5e3a0; } .c { color: #6f79a6; } .f { color: #9db4ff; }
+ul.ticks { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+ul.ticks li { padding-left: 28px; position: relative; color: var(--muted); }
+ul.ticks li::before { content: "✓"; position: absolute; left: 0; top: 0; color: var(--pass); font-weight: 700; }
+ul.ticks b { color: var(--text); }
+
+table { width: 100%; border-collapse: collapse; font-size: .93rem; }
+th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; }
+td code { white-space: nowrap; }
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-raised); }
+
+.caution { border: 1px solid var(--danger-line); border-left-width: 5px; background: var(--danger-bg); border-radius: 12px; padding: 18px 20px; margin: 0 0 26px; }
+.caution strong.title { color: var(--danger-line); display: block; font-size: 1.02rem; margin-bottom: 6px; }
+.caution p { margin: 6px 0 0; }
+
+ol.steps { padding-left: 1.2em; display: grid; gap: 10px; color: var(--muted); }
+ol.steps b { color: var(--text); }
+
+footer { margin-top: 80px; border-top: 1px solid var(--line); padding: 30px 0 46px; color: var(--muted); font-size: .9rem; text-align: center; }
+footer a { margin: 0 9px; }
+</style>
+</head>
+<body>
+
+<nav>
+	<div class="wrap">
+		<a class="brand" href="#top"><img src="logo.svg" alt=""> LuneTest</a>
+		<div class="links">
+			<a href="#modes">Test kinds</a>
+			<a href="#write">Writing tests</a>
+			<a href="#network">Network</a>
+			<a href="#ci">CI/CD</a>
+			<a href="#agents">AI agents</a>
+			<a class="gh" href="https://github.com/AustinBarikdar/LuneTest">GitHub</a>
+		</div>
+	</div>
+</nav>
+
+<header class="hero wrap" id="top">
+	<img src="logo.svg" alt="LuneTest logo">
+	<h1>Test your Roblox game<br>from the <em>terminal</em>.</h1>
+	<p class="lede">One command runs your specs. Plain logic finishes in milliseconds without opening Studio, and tests that need the real engine run in Studio or on Roblox's own servers.</p>
+
+	<div class="cmd" data-tabs>
+		<div class="tabs" role="tablist">
+			<button role="tab" aria-selected="true" data-tab="unix">macOS / Linux</button>
+			<button role="tab" aria-selected="false" data-tab="win">Windows PowerShell</button>
+			<span class="note">run in your Rojo project folder</span>
+		</div>
+		<div class="row" data-panel="unix">
+			<pre>curl -fsSL https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/install.luau | lune run -</pre>
+			<button class="copy">Copy</button>
+		</div>
+		<div class="row" data-panel="win" hidden>
+			<pre>irm https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/install.luau | lune run -</pre>
+			<button class="copy">Copy</button>
+		</div>
+	</div>
+	<p class="after">Then it's just <code>lune run test</code>. Needs <a href="https://rojo.space">Rojo</a>, <a href="https://lune-org.github.io/docs">Lune</a> and <a href="https://wally.run">Wally</a>.</p>
+
+	<div class="term" aria-label="Example output of lune run test">
+		<div class="bar"><i></i><i></i><i></i></div>
+<pre><span class="p">$</span> <span class="hl">lune run test</span>
+  <span class="ok">PASS</span>  [unit] Economy/CoinsSpec › adds coins
+  <span class="ok">PASS</span>  [unit] Network/PacketsSpec › batched packets go client -> server -> client
+  <span class="no">FAIL</span>  [unit] Economy/CoinsSpec › rejects negative amounts
+        <span class="dim">ReplicatedStorage.LuneTestSpecs.Unit.Economy.CoinsSpec:12:</span> expected function to throw
+  <span class="ok">PASS</span>  [server] ExampleServerSpec › runs on the server  <span class="dim">(lune)</span>
+<span class="dim">[lunetest] 2 of 3 e2e specs need Studio</span>
+<span class="dim">[lunetest] running in Studio (in the background)...</span>
+  <span class="ok">PASS</span>  [server] Combat/RaycastSpec › ray into empty space hits nothing  <span class="dim">(studio)</span>
+  <span class="ok">PASS</span>  [client] HudSpec › PlayerGui exists  <span class="dim">(studio)</span>
+
+<span class="dim">[lunetest]</span> <span class="no">5 passed, 1 failed</span> <span class="dim">(8.06s)</span></pre>
+	</div>
+</header>
+
+<section class="wrap" id="modes">
+	<h2>Three places a test can run</h2>
+	<p class="sub">You decide by which folder a spec lives in. LuneTest picks the fastest place that can actually run it.</p>
+	<div class="grid">
+		<div class="card">
+			<span class="tag t-unit">UNIT</span>
+			<h3>Inside Lune</h3>
+			<p>Runs against your Rojo-built place without Studio. 6,000 tests take about 0.2 seconds. For functions, data, state, and client ↔ server messaging.</p>
+			<div class="where">tests/unit/ · lune run test unit</div>
+		</div>
+		<div class="card">
+			<span class="tag t-e2e">E2E</span>
+			<h3>Real Roblox Studio</h3>
+			<p>A real server and a real client with a character. Studio starts in the background, runs the specs, and closes itself.</p>
+			<div class="where">tests/e2e/{server,client,shared}/ · lune run test e2e</div>
+		</div>
+		<div class="card">
+			<span class="tag t-cloud">CLOUD</span>
+			<h3>Roblox's servers</h3>
+			<p>Server and shared specs run in an Open Cloud task, so they work in CI where there is no Studio. Your place is never changed.</p>
+			<div class="where">lune run test --cloud</div>
+		</div>
+	</div>
+</section>
+
+<section class="wrap">
+	<h2>Lune first, Studio only when needed</h2>
+	<p class="sub">Many specs written for Studio pass in Lune too, so every e2e spec is tried there first. Studio opens only for the ones that need it.</p>
+	<div class="flow">
+		<div><b>Build</b>Rojo builds your project with the test runtime and specs injected. Your own project file is untouched.</div>
+		<div><b>Try in Lune</b>Server and shared specs run as a simulated server, client specs as a simulated client.</div>
+		<div><b>Fall back</b>A spec with any failure is rerun in Studio (or the cloud). That result is final, so Lune can't cause a false failure.</div>
+		<div><b>Remember</b>Specs that needed Studio skip the Lune attempt next time. Editing a spec retries it.</div>
+	</div>
+</section>
+
+<section class="wrap" id="write">
+	<h2>Writing a test</h2>
+	<p class="sub">A spec is a file ending in <code>Spec</code> that returns named test functions. Subfolders are groups you can run on their own.</p>
+	<div class="split">
+<pre class="code"><span class="c">--!strict</span>
+<span class="c">-- tests/unit/Economy/CoinsSpec.luau</span>
+<span class="k">local</span> ReplicatedStorage = game:<span class="f">GetService</span>(<span class="s">"ReplicatedStorage"</span>)
+<span class="k">local</span> expect = <span class="f">require</span>(ReplicatedStorage.LuneTest).expect
+<span class="k">local</span> Coins = <span class="f">require</span>(ReplicatedStorage.Shared.Coins)
+
+<span class="k">return</span> {
+	[<span class="s">"adds coins"</span>] = <span class="k">function</span>()
+		<span class="f">expect</span>(Coins.<span class="f">add</span>(<span class="s">10</span>, <span class="s">5</span>)).<span class="f">toBe</span>(<span class="s">15</span>)
+	<span class="k">end</span>,
+
+	[<span class="s">"rejects negative amounts"</span>] = <span class="k">function</span>()
+		<span class="f">expect</span>(<span class="k">function</span>()
+			Coins.<span class="f">add</span>(<span class="s">10</span>, <span class="s">-1</span>)
+		<span class="k">end</span>).<span class="f">toThrow</span>(<span class="s">"must be positive"</span>)
+	<span class="k">end</span>,
+}</pre>
+		<div>
+			<ul class="ticks">
+				<li><b>Failures point at the line.</b> Every failure shows the spec file and line number.</li>
+				<li><b>Stuck tests don't hang the run.</b> Each test has its own timeout, so a <code>WaitForChild</code> that never returns fails one test.</li>
+				<li><b>Filter by anything.</b> <code>lune run test unit Economy</code> runs a folder, a spec or a single test by name.</li>
+				<li><b>Strict by default.</b> The runtime, matchers and templates all pass <code>--!strict</code>.</li>
+				<li><b>Matchers you expect.</b> <code>toBe</code>, <code>toEqual</code>, <code>toBeCloseTo</code>, <code>toContain</code>, <code>toThrow</code>, <code>toBeA</code> and more, each with <code>.never</code>.</li>
+			</ul>
+		</div>
+	</div>
+</section>
+
+<section class="wrap" id="network">
+	<h2>Test networking without opening Studio</h2>
+	<p class="sub"><code>LuneTest.network</code> runs client and server code together inside Lune. RemoteEvents, RemoteFunctions and per-frame packet batching all work, so packet libraries need no setup.</p>
+	<div class="split">
+<pre class="code">[<span class="s">"server answers a ping"</span>] = <span class="k">function</span>()
+	network.<span class="f">server</span>(<span class="k">function</span>()
+		remote.OnServerEvent:<span class="f">Connect</span>(<span class="k">function</span>(player, msg)
+			remote:<span class="f">FireClient</span>(player, msg .. <span class="s">" pong"</span>)
+		<span class="k">end</span>)
+	<span class="k">end</span>)
+
+	<span class="k">local</span> reply: string? = <span class="k">nil</span>
+	network.<span class="f">client</span>(<span class="k">function</span>()
+		remote.OnClientEvent:<span class="f">Connect</span>(<span class="k">function</span>(msg)
+			reply = msg
+		<span class="k">end</span>)
+		remote:<span class="f">FireServer</span>(<span class="s">"ping"</span>)
+	<span class="k">end</span>)
+
+	network.<span class="f">flush</span>()
+	<span class="f">expect</span>(reply).<span class="f">toBe</span>(<span class="s">"ping pong"</span>)
+<span class="k">end</span>,</pre>
+		<div>
+			<ul class="ticks">
+				<li><b>Two sides, one process.</b> Code in <code>network.client</code> gets its own copy of every module, and <code>RunService:IsClient()</code> answers correctly for each side.</li>
+				<li><b>Delivered like Roblox.</b> Messages arrive on a later frame with their arguments copied.</li>
+				<li><b>Handler errors fail the test.</b> An error inside a remote handler isn't lost.</li>
+				<li><b>Spy on traffic.</b> <code>network.spy(remote)</code> records everything sent through a remote.</li>
+				<li><b>Remotes from a table.</b> Declare your remotes in the config and they exist in every test.</li>
+			</ul>
+		</div>
+	</div>
+</section>
+
+<section class="wrap" id="ci">
+	<h2>CI/CD</h2>
+	<p class="sub">Unit specs run on any CI machine. Server specs can run on Roblox's own servers. Specs that need a real player still need Studio.</p>
+
+	<div class="tablewrap">
+	<table>
+		<tr><th>Kind of test</th><th>In CI?</th><th>How</th></tr>
+		<tr><td>Unit specs, including simulated client ↔ server</td><td><span class="ok">Yes</span></td><td><code>lune run test unit</code></td></tr>
+		<tr><td>Server and shared specs needing the real engine</td><td><span class="ok">Yes</span></td><td><code>lune run test --cloud</code></td></tr>
+		<tr><td>Anything needing a real player, character or UI</td><td><span class="no">No</span></td><td>Studio, on your own machine</td></tr>
+	</table>
+	</div>
+
+	<h3 style="margin:34px 0 12px">Unit tests on every push</h3>
+<pre class="code"><span class="c"># .github/workflows/test.yml</span>
+<span class="f">name</span>: Tests
+<span class="f">on</span>: [push, pull_request]
+<span class="f">jobs</span>:
+  <span class="f">test</span>:
+    <span class="f">runs-on</span>: ubuntu-latest
+    <span class="f">steps</span>:
+      - <span class="f">uses</span>: actions/checkout@v4
+      - <span class="f">uses</span>: CompeyDev/setup-rokit@v0.1.2
+      - <span class="f">run</span>: wally install
+      - <span class="f">run</span>: lune run test unit</pre>
+
+	<h3 style="margin:34px 0 12px">Server specs on Roblox's servers</h3>
+	<div class="caution" role="note">
+		<strong class="title">Do NOT use your production game's Universe ID or Place ID. Create a blank place and use its IDs instead.</strong>
+		<p><b>Your tests can overwrite live data.</b> Specs run inside the experience you configure, with full access to its DataStores, MemoryStores and messaging. A spec that calls <code>SetAsync</code> or <code>RemoveAsync</code> changes that experience's saved data for real. Pointed at your production game, a test could overwrite or delete real player data.</p>
+		<p>The place itself is not overwritten: <code>--cloud</code> never saves or publishes anything to it. A blank test experience has no data to lose.</p>
+	</div>
+	<ol class="steps">
+		<li><b>Create a blank test place.</b> In Studio: File → New → Baseplate, then File → Publish to Roblox.</li>
+		<li><b>Copy its Universe ID and Start Place ID</b> from the ⋯ menu on the Creator Dashboard.</li>
+		<li><b>Add them to <code>.lune/test.luau</code>:</b> <code>cloud = { universeId = …, placeId = … },</code></li>
+		<li><b>Create an Open Cloud API key</b> with <code>luau-execution-sessions</code> → Write on only that test experience.</li>
+		<li><b>Give the key to the run</b> as the <code>ROBLOX_API_KEY</code> environment variable (a repository secret in CI). Never put it in a file.</li>
+		<li><b>Run</b> <code>lune run test --cloud</code>.</li>
+	</ol>
+	<p class="sub" style="margin-top:18px">A cloud task is a bare server: no players, no client, no running physics, and your game's own scripts don't start. Client specs are listed as <span class="sk">SKIP</span> so nothing disappears silently.</p>
+</section>
+
+<section class="wrap" id="agents">
+	<h2>Built for AI coding agents too</h2>
+	<p class="sub">Setup installs a skill that teaches Claude Code and Codex how to write LuneTest specs well: failing test first, behavior-named tests, boundaries and error paths, deterministic and independent tests.</p>
+	<div class="grid">
+		<div class="card"><h3>Claude Code</h3><p>Picked up automatically when you ask for tests.</p><div class="where">.claude/skills/lunetest-testing/</div></div>
+		<div class="card"><h3>Codex</h3><p>Same skill file, in Codex's skills folder. Unit tests run inside its sandbox.</p><div class="where">.agents/skills/lunetest-testing/</div></div>
+		<div class="card"><h3>Yours to edit</h3><p>It's a plain Markdown file. Add your project's conventions and commit it for the whole team.</p><div class="where">SKILL.md</div></div>
+	</div>
+</section>
+
+<section class="wrap" id="start">
+	<h2>Already use Wally?</h2>
+	<p class="sub">Add LuneTest like any other package. You only run <code>init</code> once per project; after that, updating is just <code>wally install</code>.</p>
+<pre class="code"><span class="c"># wally.toml</span>
+[dev-dependencies]
+LuneTest = <span class="s">"austinbarikdar/lunetest@0.1.0"</span></pre>
+	<div class="cmd" data-tabs style="margin:16px 0 0; max-width:none">
+		<div class="tabs" role="tablist">
+			<button role="tab" aria-selected="true" data-tab="unix">macOS / Linux</button>
+			<button role="tab" aria-selected="false" data-tab="win">Windows PowerShell</button>
+		</div>
+		<div class="row" data-panel="unix">
+<pre>wally install
+lune run DevPackages/_Index/*/lunetest/lune/init.luau
+lune run test</pre>
+			<button class="copy">Copy</button>
+		</div>
+		<div class="row" data-panel="win" hidden>
+<pre>wally install
+lune run (Resolve-Path DevPackages/_Index/*/lunetest/lune/init.luau)
+lune run test</pre>
+			<button class="copy">Copy</button>
+		</div>
+	</div>
+	<p class="after" style="text-align:left">The full reference (config, matchers, troubleshooting) is in the <a href="https://github.com/AustinBarikdar/LuneTest#readme">README</a>.</p>
+</section>
+
+<footer>
+	<div class="wrap">
+		<a href="https://github.com/AustinBarikdar/LuneTest">GitHub</a>
+		<a href="https://github.com/AustinBarikdar/LuneTest#readme">Documentation</a>
+		<a href="https://github.com/AustinBarikdar/LuneTest/issues">Issues</a>
+		<a href="https://github.com/AustinBarikdar/LuneTest/blob/main/LICENSE">MIT License</a>
+		<p>LuneTest is not affiliated with Roblox Corporation.</p>
+	</div>
+</footer>
+
+<script>
+// OS tabs: one choice switches every command box on the page.
+const isWindows = /Win/i.test(navigator.platform || navigator.userAgent);
+function select(os) {
+	document.querySelectorAll("[data-tabs]").forEach((box) => {
+		box.querySelectorAll("[data-tab]").forEach((tab) => tab.setAttribute("aria-selected", tab.dataset.tab === os));
+		box.querySelectorAll("[data-panel]").forEach((panel) => (panel.hidden = panel.dataset.panel !== os));
+	});
+}
+document.querySelectorAll("[data-tab]").forEach((tab) => tab.addEventListener("click", () => select(tab.dataset.tab)));
+select(isWindows ? "win" : "unix");
+
+document.querySelectorAll(".copy").forEach((button) =>
+	button.addEventListener("click", async () => {
+		const text = button.parentElement.querySelector("pre").innerText;
+		try {
+			await navigator.clipboard.writeText(text);
+			button.textContent = "Copied";
+		} catch {
+			button.textContent = "Select + copy";
+		}
+		setTimeout(() => (button.textContent = "Copy"), 1600);
+	})
+);
+</script>
+</body>
+</html>

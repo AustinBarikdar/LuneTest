@@ -1,6 +1,22 @@
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/docs/logo.svg" width="104" alt="LuneTest logo">
+
 # LuneTest
 
-A Roblox testing framework for Rojo projects that you run from the terminal with one command:
+**Test your Roblox game from the terminal.**
+
+One command runs your specs. Plain logic finishes in milliseconds without opening Studio,<br>
+and tests that need the real engine run in Studio or on Roblox's own servers.
+
+[![CI](https://github.com/AustinBarikdar/LuneTest/actions/workflows/test.yml/badge.svg)](https://github.com/AustinBarikdar/LuneTest/actions/workflows/test.yml)
+[![Wally](https://img.shields.io/badge/wally-austinbarikdar%2Flunetest-f4e9c1?labelColor=1b2550)](https://wally.run/package/austinbarikdar/lunetest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-4ade80?labelColor=1b2550)](LICENSE)
+[![Strict Luau](https://img.shields.io/badge/luau---!strict-9db4ff?labelColor=1b2550)](#writing-specs)
+
+[**Website**](https://austinbarikdar.github.io/LuneTest/) · [Quick start](#quick-start) · [Writing specs](#writing-specs) · [Simulated network](#simulated-network-unit-specs) · [CI/CD](#cicd) · [AI agents](#ai-coding-agents)
+
+</div>
 
 ```
 $ lune run test
@@ -8,14 +24,90 @@ $ lune run test
   PASS  [unit] Network/PacketsSpec › batched packets go client -> server -> client
   FAIL  [unit] Economy/CoinsSpec › rejects negative amounts
         ReplicatedStorage.LuneTestSpecs.Unit.Economy.CoinsSpec:12: expected function to throw
-[lunetest] running 2 e2e specs in Studio...
-  PASS  [server] ExampleServerSpec › runs on the server
-  PASS  [client] ExampleClientSpec › has a character
+  PASS  [server] ExampleServerSpec › runs on the server  (lune)
+[lunetest] 2 of 3 e2e specs need Studio
+[lunetest] running in Studio (in the background)...
+  PASS  [server] Combat/RaycastSpec › ray into empty space hits nothing  (studio)
+  PASS  [client] HudSpec › PlayerGui exists  (studio)
 
-[lunetest] 12 passed, 1 failed (8.06s)
+[lunetest] 5 passed, 1 failed (8.06s)
 ```
 
-There are two kinds of test:
+## Why LuneTest
+
+<table>
+<tr>
+<td width="33%" valign="top">
+
+### ⚡ Fast by default
+
+Unit specs run inside Lune against your Rojo-built place. No Studio, and 6,000 tests take about 0.2 seconds.
+
+</td>
+<td width="33%" valign="top">
+
+### 🎮 Real when it matters
+
+Specs that need the engine run in a real Studio Play session, with a real server, client and character. Studio starts in the background and closes itself.
+
+</td>
+<td width="33%" valign="top">
+
+### ☁️ Works in CI
+
+Server specs run on Roblox's own servers through Open Cloud, with no Studio. Your place is never changed.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+### 🔁 Lune first
+
+Every e2e spec is tried in Lune before Studio opens. Only the ones that fail there go to Studio, whose result is final.
+
+</td>
+<td valign="top">
+
+### 📡 Network without Studio
+
+Client and server code run together inside Lune, with working remotes and per-frame packet batching.
+
+</td>
+<td valign="top">
+
+### 🤖 Agent-ready
+
+Setup installs a skill that teaches Claude Code and Codex to write good specs.
+
+</td>
+</tr>
+</table>
+
+## Quick start
+
+From your Rojo project's folder, one command sets everything up and runs the example tests:
+
+**macOS / Linux (Terminal):**
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/install.luau | lune run -
+```
+
+**Windows (PowerShell):**
+
+```powershell
+irm https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/install.luau | lune run -
+```
+
+After that:
+
+```sh
+lune run test          # everything
+lune run test unit     # only the fast specs, no Studio
+```
+
+There are two kinds of test, decided by the folder a spec is in:
 
 | Kind | Folder | Runs | Speed |
 | --- | --- | --- | --- |
@@ -25,6 +117,22 @@ There are two kinds of test:
 Studio only opens when at least one e2e spec actually needs it. It runs in the background in its own instance, and that instance closes when the run is over. A Studio you already have open is left alone.
 
 The exit code is 0 when everything passes and 1 when something fails, so it works in scripts and CI.
+
+## Contents
+
+- [Requirements](#requirements)
+- [Setup](#setup)
+- [Running](#running)
+- [Writing specs](#writing-specs)
+- [Lune first, Studio fallback](#lune-first-studio-fallback-e2e-specs)
+- [Simulated network](#simulated-network-unit-specs)
+- [Remotes table](#remotes-table)
+- [CI/CD](#cicd)
+- [AI coding agents](#ai-coding-agents)
+- [Config](#config)
+- [Reliability on slow machines](#reliability-on-slow-machines)
+- [Troubleshooting](#troubleshooting)
+- [Developing LuneTest](#developing-lunetest)
 
 ## Requirements
 
