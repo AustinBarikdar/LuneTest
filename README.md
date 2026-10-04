@@ -33,13 +33,15 @@ The exit code is 0 when everything passes and 1 when something fails, so it work
 
 ## Setup
 
-From your project root, one command does everything:
+From your project root, one command does everything. Use the one for your system:
+
+**macOS / Linux (Terminal):**
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/install.luau | lune run -
 ```
 
-On Windows PowerShell:
+**Windows (PowerShell):**
 
 ```powershell
 irm https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/install.luau | lune run -
@@ -58,25 +60,27 @@ Already use Wally? Add LuneTest like any other package:
    LuneTest = "austinbarikdar/lunetest@0.1.0"
    ```
 
-2. Download it:
+2. Download it (same on every system):
 
    ```sh
    wally install
    ```
 
-3. Run the LuneTest `init` once, from your project root:
+3. Run the LuneTest `init` once, from your project root. This command differs by system:
+
+   **macOS / Linux (Terminal):**
 
    ```sh
    lune run DevPackages/_Index/*/lunetest/lune/init.luau
    ```
 
-   On Windows PowerShell:
+   **Windows (PowerShell):**
 
    ```powershell
    lune run (Resolve-Path DevPackages/_Index/*/lunetest/lune/init.luau)
    ```
 
-4. Run your tests:
+4. Run your tests (same on every system):
 
    ```sh
    lune run test
@@ -285,13 +289,15 @@ If your project is a library, meaning its tree isn't a `DataModel`, LuneTest mou
 
 `example/` is a small project that uses every feature. Wally has no local path dependencies, so link this repo into it by hand:
 
+**macOS / Linux (Terminal):**
+
 ```sh
 mkdir -p example/DevPackages/_Index/austinbarikdar_lunetest@0.1.0
 ln -s "$PWD" example/DevPackages/_Index/austinbarikdar_lunetest@0.1.0/lunetest
 cd example && lune run test
 ```
 
-On Windows PowerShell, use a junction instead (no admin rights needed):
+**Windows (PowerShell)**, using a junction (no admin rights needed):
 
 ```powershell
 New-Item -ItemType Directory -Force example/DevPackages/_Index/austinbarikdar_lunetest@0.1.0
