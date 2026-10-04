@@ -72,6 +72,8 @@ nav .gh { color: var(--text) !important; border: 1px solid var(--line); padding:
 @media (max-width: 640px) { nav .links a:not(.gh) { display: none; } }
 
 /* hero */
+.notice { background: color-mix(in srgb, var(--skip) 14%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--skip) 45%, transparent); font-size: .9rem; text-align: center; padding: 9px 20px; }
+.notice b { color: var(--skip); }
 .hero { padding: 76px 20px 34px; text-align: center; }
 .hero img { width: 84px; height: 84px; }
 h1 { font-size: clamp(2.1rem, 6vw, 3.5rem); line-height: 1.08; letter-spacing: -.035em; margin: 20px 0 16px; }
@@ -155,6 +157,8 @@ footer a { margin: 0 9px; }
 		</div>
 	</div>
 </nav>
+
+<div class="notice" role="note"><b>Still in development.</b> Expect bugs and changes between versions. Found one? <a href="https://github.com/AustinBarikdar/LuneTest/issues/new/choose">Report it</a>.</div>
 
 <header class="hero wrap" id="top">
 	<img src="logo.svg" alt="LuneTest logo">

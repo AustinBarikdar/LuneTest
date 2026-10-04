@@ -18,6 +18,9 @@ and tests that need the real engine run in Studio or on Roblox's own servers.
 
 </div>
 
+> [!WARNING]
+> **LuneTest is still in development.** Expect bugs, rough edges, and changes between versions while it is at 0.x. It is tested mostly on macOS; Windows support is newer and less proven. If something breaks, please [report it](https://github.com/AustinBarikdar/LuneTest/issues/new/choose). Bug reports and fixes are what make it stable.
+
 ```
 $ lune run test
   PASS  [unit] Economy/CoinsSpec › adds coins
