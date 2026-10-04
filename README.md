@@ -100,7 +100,7 @@ curl -fsSL https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/instal
 **Windows (PowerShell):**
 
 ```powershell
-irm https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/install.luau | lune run -
+cmd /c "curl -fsSL https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/install.luau | lune run -"
 ```
 
 After that:
@@ -157,10 +157,12 @@ curl -fsSL https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/instal
 **Windows (PowerShell):**
 
 ```powershell
-irm https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/install.luau | lune run -
+cmd /c "curl -fsSL https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/install.luau | lune run -"
 ```
 
 It adds LuneTest to `wally.toml` (creating the file if you don't have one), runs `wally install`, sets the project up, and runs the example unit tests so you can see it working. If Rojo or Wally is missing, it installs them with Rokit. It's safe to run again.
+
+The Windows command goes through `cmd` on purpose. In a UTF-8 console (code page 65001), Windows PowerShell puts a byte-order mark in front of anything it pipes, and Lune stops with `got Unicode character U+feff`.
 
 ### Easy download integration for Wally
 

@@ -1,8 +1,9 @@
 --!strict
 -- One-command installer. From your project root:
 --   curl -fsSL https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/install.luau | lune run -
--- PowerShell:
---   irm https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/install.luau | lune run -
+-- Windows, through cmd: in a UTF-8 console, PowerShell puts a byte-order mark in front of
+-- what it pipes (`irm ... | lune run -`), and Lune can't parse that.
+--   cmd /c "curl -fsSL https://raw.githubusercontent.com/AustinBarikdar/LuneTest/main/install.luau | lune run -"
 --
 -- Adds LuneTest to wally.toml, downloads it, sets the project up and runs the unit
 -- examples. Safe to run again: nothing that already exists is overwritten.

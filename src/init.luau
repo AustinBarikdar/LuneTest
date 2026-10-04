@@ -115,9 +115,11 @@ local function runWithTimeout(fn: () -> (), timeout: number, specPath: string): 
 		end)
 		done, ok, message = true, success, if success then nil else err
 	end)
-	local elapsed = 0
-	while not done and elapsed < timeout do
-		elapsed += task.wait()
+	-- The clock, not the sum of what task.wait() returns: on Windows, Lune sleeps about
+	-- 15ms per wait and reports 1ms, which made every timeout run 15x long.
+	local deadline = os.clock() + timeout
+	while not done and os.clock() < deadline do
+		task.wait()
 	end
 	if not done then
 		task.cancel(thread)

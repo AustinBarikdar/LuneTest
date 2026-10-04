@@ -231,9 +231,9 @@ return function(game: any, waitTimeout: number)
 	local callbacks: { [any]: { [string]: { fn: any, realm: Realm } } } = setmetatable({}, { __mode = "k" }) :: any
 	local function invoke(self: any, name: string, direction: string, args: { n: number, [number]: any }, ...: any)
 		record(self, direction, args)
-		local waited = 0
-		while not (callbacks[self] and callbacks[self][name]) and waited < waitTimeout do
-			waited += task.wait()
+		local deadline = os.clock() + waitTimeout
+		while not (callbacks[self] and callbacks[self][name]) and os.clock() < deadline do
+			task.wait()
 		end
 		local callback = callbacks[self] and callbacks[self][name]
 		if not callback then
@@ -296,10 +296,12 @@ return function(game: any, waitTimeout: number)
 			if not ticking then
 				ticking = true
 				task.spawn(function()
-					local clock = 0
+					local clock, last = 0, os.clock()
 					while true do
-						local dt = task.wait()
-						clock += dt
+						task.wait()
+						local now = os.clock()
+						local dt = now - last
+						clock, last = clock + dt, now
 						for signalName, signal in frameSignals do
 							if signal:HasConnections() then
 								if signalName == "Stepped" then
@@ -328,11 +330,12 @@ return function(game: any, waitTimeout: number)
 
 	-- Roblox's WaitForChild yields; here the other realm may create it a frame later.
 	roblox.implementMethod("Instance", "WaitForChild", function(self, name, timeout)
+		-- Timed by the clock: task.wait() under-reports how long it slept on Windows.
 		local limit = timeout or waitTimeout
-		local waited = 0
+		local deadline = os.clock() + limit
 		local found = self:FindFirstChild(name)
-		while not found and waited < limit do
-			waited += task.wait()
+		while not found and os.clock() < deadline do
+			task.wait()
 			found = self:FindFirstChild(name)
 		end
 		if not found and not timeout then
