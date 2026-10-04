@@ -58,18 +58,28 @@ Already use Wally? Add LuneTest like any other package:
    LuneTest = "austinbarikdar/lunetest@0.1.0"
    ```
 
-2. Install it and run `init` from your project root:
+2. Download it:
 
    ```sh
    wally install
+   ```
+
+3. Run the LuneTest `init` once, from your project root:
+
+   ```sh
    lune run DevPackages/_Index/*/lunetest/lune/init.luau
    ```
 
    On Windows PowerShell:
 
    ```powershell
-   wally install
    lune run (Resolve-Path DevPackages/_Index/*/lunetest/lune/init.luau)
+   ```
+
+4. Run your tests:
+
+   ```sh
+   lune run test
    ```
 
 `init` never overwrites anything, so it's safe to run again. It creates:
