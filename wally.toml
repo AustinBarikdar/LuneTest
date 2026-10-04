@@ -6,6 +6,6 @@ license = "MIT"
 authors = ["AustinBarikdar"]
 registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
-exclude = ["example", "docs", ".github", "install.luau", "rokit.toml", ".luaurc", "**/.DS_Store"]
+exclude = ["example", "docs", ".github", "CONTRIBUTING.md", "install.luau", "rokit.toml", ".luaurc", "**/.DS_Store"]
 
 [dependencies]

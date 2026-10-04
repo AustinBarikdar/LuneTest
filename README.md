@@ -14,7 +14,7 @@ and tests that need the real engine run in Studio or on Roblox's own servers.
 [![License: MIT](https://img.shields.io/badge/license-MIT-4ade80?labelColor=1b2550)](LICENSE)
 [![Strict Luau](https://img.shields.io/badge/luau---!strict-9db4ff?labelColor=1b2550)](#writing-specs)
 
-[**Website**](https://austinbarikdar.github.io/LuneTest/) · [Quick start](#quick-start) · [Writing specs](#writing-specs) · [Simulated network](#simulated-network-unit-specs) · [CI/CD](#cicd) · [AI agents](#ai-coding-agents)
+[**Website**](https://austinbarikdar.github.io/LuneTest/) · [Quick start](#quick-start) · [Writing specs](#writing-specs) · [Simulated network](#simulated-network-unit-specs) · [CI/CD](#cicd) · [AI agents](#ai-coding-agents) · [Contributing](#contributing)
 
 </div>
 
@@ -132,6 +132,7 @@ The exit code is 0 when everything passes and 1 when something fails, so it work
 - [Config](#config)
 - [Reliability on slow machines](#reliability-on-slow-machines)
 - [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
 - [Developing LuneTest](#developing-lunetest)
 
 ## Requirements
@@ -512,6 +513,16 @@ If your project is a library, meaning its tree isn't a `DataModel`, LuneTest mou
 - **A unit spec says something `is not a valid member`**: that's engine behavior Lune doesn't have. Move the spec to `tests/e2e`.
 - **`Aftman error: ... no aftman.toml files list this tool`**: an old Aftman install is ahead of Rokit on your `PATH`, and Aftman doesn't read `rokit.toml`. Move Rokit's `bin` folder (`~/.rokit/bin`) above Aftman's in `PATH`, then open a new terminal.
 - **The first e2e run takes a minute or more**: Studio was updating itself before it opened the place. Later runs are back to a few seconds.
+
+## Contributing
+
+Found a bug, or want to fix one? Both are welcome.
+
+- **Report a bug:** open an issue with the [bug report form](https://github.com/AustinBarikdar/LuneTest/issues/new/choose). Include the command you ran, the terminal output, your versions and your system. Never paste an API key or token.
+- **Fix a bug:** reproduce it with a failing spec in `example/tests/` first, fix the cause, then keep the spec so it can't come back.
+- **Open a pull request:** branch from `main`, keep it to one fix or feature, run `lune run test unit` in `example/`, and say what you tested and on which system. CI runs the unit specs and strict type checks on every pull request.
+
+The full guide, with setup steps and a map of the code, is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Developing LuneTest
 
