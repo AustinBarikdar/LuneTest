@@ -25,8 +25,9 @@ local config = {
 	timeout = 300, -- seconds to wait for Studio to report back
 	fallback = true, -- try e2e specs in Lune first; only the ones that fail there run in Studio
 
-	-- For CI: `lune run test --cloud` runs server and shared specs on Roblox's servers.
-	-- Use a throwaway test place, and put the API key in the ROBLOX_API_KEY environment variable.
+	-- For CI: `lune run test --cloud` runs server and shared specs on Roblox's servers, in
+	-- this place (it is never changed). The API key goes in the ROBLOX_API_KEY environment
+	-- variable, never in this file.
 	-- cloud = { universeId = 0, placeId = 0 },
 
 	-- Remotes to create in the test place (works in unit and e2e). A bare name is a RemoteEvent.

@@ -35,8 +35,9 @@ export type Config = {
 	testTimeout: number?, -- seconds before one test counts as hung; default 30
 	clientTimeout: number?, -- seconds the Studio client gets to start; default 90
 	startTimeout: number?, -- seconds Studio gets to enter Play before the place is reopened; default 90
-	-- Where `--cloud` runs server and shared specs: a throwaway test place, never your live
-	-- game. The API key comes from the ROBLOX_API_KEY environment variable, never from here.
+	-- The place `--cloud` runs server and shared specs in. It is never modified, but specs
+	-- run inside that experience (its DataStores), so a separate test experience is best.
+	-- The API key comes from the ROBLOX_API_KEY environment variable, never from here.
 	cloud: { universeId: number | string, placeId: number | string }?,
 	-- Remotes to create in the test place, by parent path:
 	--   { ["ReplicatedStorage.Remotes"] = { "Chat", GetData = "RemoteFunction" } }
@@ -369,18 +370,18 @@ end
 -- Overridable so the client can be tested against a local stand-in server.
 local OPEN_CLOUD = process.env.LUNETEST_OPEN_CLOUD_URL or "https://apis.roblox.com"
 
--- Runs the server and shared specs of the built place as an Open Cloud Luau execution
--- task: no Studio, no window, no port. Results come back as the task's return value.
+-- Runs the server and shared specs as an Open Cloud Luau execution task: no Studio, no
+-- window, no port, and no change to the place. Results come back as the task's return value.
 local function runCloud(config: Config, dryRun: boolean): Results
 	local cloud = config.cloud
 	if not cloud then
-		return fail("`--cloud` needs `cloud = { universeId = ..., placeId = ... }` in your test launcher. Use a throwaway test place")
+		return fail("`--cloud` needs `cloud = { universeId = ..., placeId = ... }` in your test launcher")
 	end
 	local key = process.env.ROBLOX_API_KEY
 	if not key and not dryRun then
 		fail(
 			"`--cloud` needs the ROBLOX_API_KEY environment variable: an Open Cloud API key with "
-				.. "universe-places (write) and luau-execution-sessions (write) on that test place"
+				.. "luau-execution-sessions (write) on that test place"
 		)
 	end
 	local timeout = math.min(config.timeout or 300, 300) -- tasks are capped at 5 minutes
@@ -401,20 +402,52 @@ local function runCloud(config: Config, dryRun: boolean): Results
 		return serde.decode("json", response.body)
 	end
 
-	-- Saved, never Published: the upload must not go live.
-	local version = call(
+	-- The place itself is never modified. The built test content travels as the task's
+	-- binary input and lune/cloud.luau loads it into the task's own, temporary DataModel.
+	-- Service children only: service properties (Lighting settings and the like) and
+	-- StarterPlayer stay as the host place has them, and Terrain can't be created.
+	local built = roblox.deserializePlace(fs.readFile(PLACE_FILE))
+	local folders = {}
+	for _, service in built:GetChildren() do
+		if service.ClassName ~= "StarterPlayer" then
+			local folder = roblox.Instance.new("Folder")
+			folder.Name = service.ClassName
+			for _, child in service:GetChildren() do
+				if child.ClassName ~= "Terrain" and child.ClassName ~= "Camera" then
+					child.Parent = folder
+				end
+			end
+			if #folder:GetChildren() > 0 then
+				table.insert(folders, folder)
+			end
+		end
+	end
+	local model = roblox.serializeModel(folders)
+
+	local input = call(
 		"POST",
-		`{OPEN_CLOUD}/universes/v1/{cloud.universeId}/places/{cloud.placeId}/versions?versionType=Saved`,
-		"application/octet-stream",
-		fs.readFile(PLACE_FILE)
+		`{OPEN_CLOUD}/cloud/v2/universes/{cloud.universeId}/luau-execution-session-task-binary-inputs`,
+		"application/json",
+		serde.encode("json", { size = #model })
 	)
+	if dryRun then
+		info(`[dry run] PUT <uploadUri> ({#model} bytes of test content)`)
+	else
+		local uploadHeaders: { [string]: string } = { ["Content-Type"] = "application/octet-stream" }
+		local upload = net.request({ url = input.uploadUri :: string, method = "PUT", headers = uploadHeaders, body = model })
+		if not upload.ok then
+			fail(`uploading the test content failed: {upload.statusCode} {upload.statusMessage}\n{upload.body}`)
+		end
+	end
 	local job = call(
 		"POST",
-		`{OPEN_CLOUD}/cloud/v2/universes/{cloud.universeId}/places/{cloud.placeId}/versions/{if version
-			then version.versionNumber
-			else "<version>"}/luau-execution-session-tasks`,
+		`{OPEN_CLOUD}/cloud/v2/universes/{cloud.universeId}/places/{cloud.placeId}/luau-execution-session-tasks`,
 		"application/json",
-		serde.encode("json", { script = fs.readFile(`{PACKAGE_DIR}/lune/cloud.luau`), timeout = `{timeout}s` })
+		serde.encode("json", {
+			script = fs.readFile(`{PACKAGE_DIR}/lune/cloud.luau`),
+			timeout = `{timeout}s`,
+			binaryInput = if input then input.path else "<binary input path>",
+		})
 	)
 	if dryRun then
 		info("[dry run] GET the task every 2s until it is COMPLETE or FAILED, then read output.results[1]")

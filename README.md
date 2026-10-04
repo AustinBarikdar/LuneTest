@@ -281,14 +281,14 @@ lune run test --cloud             # unit specs, then e2e specs in the cloud
 lune run test --cloud --dry-run   # print the Open Cloud calls without sending anything
 ```
 
-What `--cloud` does: it uploads the built test place as a **Saved** version (never Published, so nothing goes live), starts a task on that version that runs your specs, and reads the results from the task's return value.
+What `--cloud` does: it sends the built test content to an Open Cloud task as binary input, the task loads it into its own temporary copy of the place and runs your specs, and LuneTest reads the results from the task's return value. **The place itself is never changed**: nothing is saved or published, and the task's copy is thrown away when it ends.
 
 To set it up:
 
-1. Create a **throwaway test place**. Don't use your live game: every run saves a new version of the place.
-2. Create an Open Cloud API key at [create.roblox.com/dashboard/credentials](https://create.roblox.com/dashboard/credentials) with **universe-places** (write) and **luau-execution-sessions** (write) on that place.
+1. Pick a place for the tasks to run in. A separate, empty test experience is best: the task runs inside that experience, so a spec that writes to a DataStore would write to that experience's data.
+2. Create an Open Cloud API key at [create.roblox.com/dashboard/credentials](https://create.roblox.com/dashboard/credentials). Add **luau-execution-sessions**, add your test experience inside it, and tick **Write**. That is the only permission needed.
 3. Put the IDs in the launcher config: `cloud = { universeId = 123, placeId = 456 },`
-4. Give the key to the run as the `ROBLOX_API_KEY` environment variable. In GitHub Actions, store it as a secret:
+4. Give the key to the run as the `ROBLOX_API_KEY` environment variable. Never put it in a file. In GitHub Actions, store it as a secret:
 
    ```yaml
          - run: lune run test --cloud
@@ -296,11 +296,14 @@ To set it up:
              ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
    ```
 
+If the run stops with `403 Scope not authorized`, the key doesn't have that experience added under **luau-execution-sessions** with **Write**.
+
 What a cloud task can and can't do:
 
 - **It's a bare server.** There are no players and no client, physics doesn't simulate, and your place's own scripts don't start. Specs that work from a cold server pass: real `require`, DataStores, HttpService, engine services.
 - **Client specs are skipped,** and each one is listed as `SKIP` so nothing disappears silently. Specs that assume the game has booted, or need a character, still need Studio.
 - **Lune goes first here too.** Only the specs that fail in Lune are sent to the cloud.
+- **Only the contents of each service are sent.** Service properties (Lighting settings, Workspace gravity and so on) and `StarterPlayer` stay as the host place has them, and Terrain isn't included.
 - **A task can run for 5 minutes at most.**
 
 ## AI coding agents
