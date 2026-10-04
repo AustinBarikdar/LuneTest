@@ -42,21 +42,21 @@ $ lune run test
 <tr>
 <td width="33%" valign="top">
 
-### ⚡ Fast by default
+### Fast by default
 
 Unit specs run inside Lune against your Rojo-built place. No Studio, and 6,000 tests take about 0.2 seconds.
 
 </td>
 <td width="33%" valign="top">
 
-### 🎮 Real when it matters
+### Real when it matters
 
 Specs that need the engine run in a real Studio Play session, with a real server, client and character. Studio starts in the background and closes itself.
 
 </td>
 <td width="33%" valign="top">
 
-### ☁️ Works in CI
+### Works in CI
 
 Server specs run on Roblox's own servers through Open Cloud, with no Studio. Your place is never changed.
 
@@ -65,21 +65,21 @@ Server specs run on Roblox's own servers through Open Cloud, with no Studio. You
 <tr>
 <td valign="top">
 
-### 🔁 Lune first
+### Lune first
 
 Every e2e spec is tried in Lune before Studio opens. Only the ones that fail there go to Studio, whose result is final.
 
 </td>
 <td valign="top">
 
-### 📡 Network without Studio
+### Network without Studio
 
 Client and server code run together inside Lune, with working remotes and per-frame packet batching.
 
 </td>
 <td valign="top">
 
-### 🤖 Agent-ready
+### Agent-ready
 
 Setup installs a skill that teaches Claude Code and Codex to write good specs.
 
